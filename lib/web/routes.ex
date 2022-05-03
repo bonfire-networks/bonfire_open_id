@@ -20,7 +20,12 @@ defmodule Bonfire.OpenID.Web.Routes do
         get "/jwks", JwksController, :jwks_index
       end
 
-      ####
+      scope "/.well-known", Bonfire.OpenID.Web.Openid do
+        pipe_through [:browser]
+
+        get "/openid-configuration", UserinfoController, :discovery
+      end
+
 
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
         pipe_through [:browser] # needs current_user

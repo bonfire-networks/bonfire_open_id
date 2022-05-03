@@ -26,4 +26,10 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
     )
     |> send_resp(:unauthorized, "")
   end
+
+  def discovery(conn, _) do
+    conn
+    |> put_view(OpenidView)
+    |> render("openid-configuration.json")
+  end
 end

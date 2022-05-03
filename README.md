@@ -1,10 +1,14 @@
 # Bonfire.OpenID
 
-An extension to enable using your Bonfire identity to authenticate in other apps with OpenID Connect 1.0 or OAuth 2.0
+An extension to enable:
+- authenticating on Bonfire using an external identity using OpenID Connect
+- using your Bonfire identity to authenticate in other apps with OpenID Connect 1.0 or OAuth 2.0
 
 ## Copyright and License
 
-Powered by this MIT licensed library: https://hex.pm/packages/boruta 
+Powered by these libraries: 
+- https://hex.pm/packages/boruta (MIT license)
+- https://hex.pm/packages/openid_connect (MIT license)
 
 Extension copyright (c) 2022 Bonfire Contributors
 

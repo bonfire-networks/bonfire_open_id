@@ -21,7 +21,9 @@ defmodule Bonfire.OpenID.MixProject do
     ]
   end
 
-  def application, do: [ extra_applications: [:logger, :runtime_tools] ]
+  def application do
+    [mod: {Bonfire.OpenID.Application, []}, extra_applications: [:logger, :runtime_tools] ]
+  end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
