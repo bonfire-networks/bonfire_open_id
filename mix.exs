@@ -15,8 +15,8 @@ defmodule Bonfire.OpenID.MixProject do
       deps: Mess.deps [
         {:phoenix_live_reload, "~> 1.2", only: :dev},
         {:dbg, "~> 1.0", only: [:dev, :test]},
-        {:floki, ">= 0.0.0", only: [:dev, :test]},
-        {:mox, "~> 0.5", only: :test}
+        {:floki, ">= 0.0.0", only: [:dev, :test], override: true},
+        {:mox, "~> 0.5", only: [:dev, :test]}
       ]
     ]
   end
