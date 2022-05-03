@@ -12,7 +12,8 @@ defmodule Bonfire.OpenID.Web.OpenidView do
   def render("openid-configuration.json", _) do
     base_url = Bonfire.Common.URIs.base_url()
     %{
-      "authorization_endpoint"=> "#{base_url}/oauth/authorize",
+      # "authorization_endpoint"=> "#{base_url}/oauth/authorize",
+      "authorization_endpoint"=> "#{base_url}/openid/authorize",
       "id_token_signing_alg_values_supported"=> [
           "RS512"
       ],
@@ -30,7 +31,8 @@ defmodule Bonfire.OpenID.Web.OpenidView do
       "subject_types_supported"=> [
           "public"
       ],
-      "token_endpoint"=> "#{base_url}/oauth/token"
+      "token_endpoint"=> "#{base_url}/oauth/token",
+      "userinfo_endpoint"=> "#{base_url}/openid/userinfo"
     }
   end
 
