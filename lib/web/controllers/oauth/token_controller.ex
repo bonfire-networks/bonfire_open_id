@@ -10,7 +10,8 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   def oauth_module, do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def token(%Plug.Conn{} = conn, _params) do
-    conn |> oauth_module().token(__MODULE__)
+    conn
+    |> oauth_module().token(__MODULE__)
   end
 
   @impl Boruta.Oauth.TokenApplication
