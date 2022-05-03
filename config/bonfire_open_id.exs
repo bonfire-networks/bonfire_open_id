@@ -10,6 +10,7 @@ config :boruta, Boruta.Oauth,
     resource_owners: Bonfire.OpenID.Integration
   ]
 
+
 # config :bonfire_open_id, :openid_connect_providers,
   # bonfire_cafe: [
   #   discovery_document_uri: "https://bonfire.cafe/.well-known/openid-configuration",
@@ -19,3 +20,8 @@ config :boruta, Boruta.Oauth,
   #   response_type: "code",
   #   scope: "identity data:public"
   # ]
+
+if Mix.env()==:test do
+  config :bonfire_open_id, :oauth_module, Boruta.OauthMock
+  config :bonfire_open_id, :openid_module, Boruta.OpenidMock
+end

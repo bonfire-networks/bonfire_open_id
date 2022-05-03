@@ -184,13 +184,6 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
   end
 
   defp assert_authorize_redirected_to_login(conn) do
-    assert_raise RuntimeError,
-                 """
-                 Here occurs the login process. After login, user may be redirected to
-                 get_session(conn, :go)
-                 """,
-                 fn ->
-                   AuthorizeController.authorize(conn, %{})
-                 end
+    assert redirected_to(AuthorizeController.authorize(conn, %{})) =~ "login"
   end
 end

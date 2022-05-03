@@ -113,16 +113,18 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
   defp max_age_redirection(%Plug.Conn{} = conn, _resource_owner), do: {:unchanged, conn}
 
-  defp login_expired?(%ResourceOwner{last_login_at: last_login_at}, max_age) do
+  defp login_expired?(%ResourceOwner{last_login_at: last_login_at}, max_age) when not is_nil(last_login_at) do
     now = DateTime.utc_now() |> DateTime.to_unix()
 
-    with "" <> max_age <- max_age,
-         {max_age, _} <- Integer.parse(max_age),
+    with {max_age, _} <- Integer.parse("#{max_age}"),
          true <- now - DateTime.to_unix(last_login_at) >= max_age do
       true
     else
       _ -> false
     end
+  end
+  defp login_expired?(_, _) do
+    false # FIXME
   end
 
   defp login_redirection(%Plug.Conn{assigns: %{current_user: _current_user}} = conn) do
@@ -145,7 +147,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
       current_user ->
         %ResourceOwner{
           sub: to_string(current_user.id),
-          username: current_user.character.username,
+          username: e(current_user, :character, :username, e(current_user, :email, nil)),
           last_login_at: nil # TODO
         }
     end

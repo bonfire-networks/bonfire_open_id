@@ -19,7 +19,11 @@ defmodule Bonfire.OpenID.Integration do
 
   defp get_user(id_or_username) do
     with {:ok, user} <- Users.get_current(id_or_username) do
-      {:ok, %ResourceOwner{sub: to_string(user.id), username: user.character.username, last_login_at: nil}}
+      {:ok, %ResourceOwner{
+        sub: to_string(user.id),
+        username: user.character.username,
+        last_login_at: nil # TODO
+      }}
     else
       _ -> {:error, "User not found."}
     end

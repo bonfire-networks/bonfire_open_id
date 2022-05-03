@@ -23,7 +23,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   defp authorize_response(conn, %_{} = current_user) do
     conn
     |> oauth_module().authorize(
-      %ResourceOwner{sub: to_string(current_user.id), username: current_user.character.username},
+      %ResourceOwner{sub: to_string(current_user.id), username: e(current_user, :character, :username, e(current_user, :email, nil))},
       __MODULE__
     )
   end
