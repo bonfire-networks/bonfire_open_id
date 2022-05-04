@@ -23,7 +23,7 @@ defmodule Bonfire.OpenID.DataCase do
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
-      import Bonfire.OpenID.DataCase
+      # import Bonfire.OpenID.DataCase
     end
   end
 

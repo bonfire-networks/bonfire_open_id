@@ -26,7 +26,7 @@ defmodule Bonfire.OpenID.ConnCase do
       import Bonfire.UI.Common.Testing.Helpers
 
       import Phoenix.LiveViewTest
-      import Bonfire.OpenID.ConnCase
+      # import Bonfire.OpenID.ConnCase, async: true
 
       import Bonfire.OpenID.Test.ConnHelpers
       import Bonfire.OpenID.Test.FakeHelpers
