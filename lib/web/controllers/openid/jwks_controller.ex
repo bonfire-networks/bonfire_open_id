@@ -1,6 +1,6 @@
 defmodule Bonfire.OpenID.Web.Openid.JwksController do
   @behaviour Boruta.Openid.JwksApplication
-  use Bonfire.Web, :controller
+  use Bonfire.UI.Common.Web, :controller
 
   alias Bonfire.OpenID.Web.OpenidView
 

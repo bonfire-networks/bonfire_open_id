@@ -1,7 +1,7 @@
 defmodule Bonfire.OpenID.Web.Oauth.RevokeController do
   @behaviour Boruta.Oauth.RevokeApplication
 
-  use Bonfire.Web, :controller
+  use Bonfire.UI.Common.Web, :controller
 
   alias Boruta.Oauth.Error
   alias Bonfire.OpenID.Web.OauthView

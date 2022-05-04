@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.OauthView do
-  use Bonfire.Web, :view
+  use Bonfire.UI.Common.Web, :view
 
   alias Boruta.Oauth.IntrospectResponse
   alias Boruta.Oauth.TokenResponse

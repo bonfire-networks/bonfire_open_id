@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.OpenidView do
-  use Bonfire.Web, :view
+  use Bonfire.UI.Common.Web, :view
 
   def render("jwks.json", %{jwk_keys: jwk_keys}) do
     %{keys: jwk_keys}

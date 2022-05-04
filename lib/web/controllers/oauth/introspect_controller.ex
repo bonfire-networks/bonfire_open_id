@@ -1,7 +1,7 @@
 defmodule Bonfire.OpenID.Web.Oauth.IntrospectController do
   @behaviour Boruta.Oauth.IntrospectApplication
 
-  use Bonfire.Web, :controller
+  use Bonfire.UI.Common.Web, :controller
 
   alias Boruta.Oauth.Error
   alias Boruta.Oauth.IntrospectResponse

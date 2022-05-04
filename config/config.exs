@@ -28,8 +28,8 @@ config :mime, :types, %{
 
 config :bonfire_open_id, :otp_app, :bonfire_open_id
 config :bonfire_common, :otp_app, :bonfire_open_id
-config :bonfire_open_id, :repo_module, Bonfire.Repo
-config :bonfire_open_id, ecto_repos: [Bonfire.Repo]
+config :bonfire_open_id, :repo_module, Bonfire.Common.Repo
+config :bonfire_open_id, ecto_repos: [Bonfire.Common.Repo]
 config :bonfire_open_id, :localisation_path, "priv/localisation"
 config :bonfire_data_identity, Bonfire.Data.Identity.Credential, hasher_module: Argon2
 

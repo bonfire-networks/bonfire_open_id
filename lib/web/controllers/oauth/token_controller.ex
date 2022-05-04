@@ -1,7 +1,7 @@
 defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   @behaviour Boruta.Oauth.TokenApplication
 
-  use Bonfire.Web, :controller
+  use Bonfire.UI.Common.Web, :controller
 
   alias Boruta.Oauth.Error
   alias Boruta.Oauth.TokenResponse
