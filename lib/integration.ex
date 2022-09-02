@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Integration do
-  import Where
+  import Untangle
   alias Bonfire.Common.Config
   alias Bonfire.Common.Utils
   alias Bonfire.Me.Users

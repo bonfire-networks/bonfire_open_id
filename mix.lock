@@ -106,5 +106,5 @@
   "unsafe": {:hex, :unsafe, "1.0.1", "a27e1874f72ee49312e0a9ec2e0b27924214a05e3ddac90e91727bc76f8613d8", [:mix], [], "hexpm", "6c7729a2d214806450d29766abc2afaa7a2cbecf415be64f36a6691afebb50e5"},
   "verbs": {:git, "https://github.com/shannonwells/verbs_ex", "4b27067385390d4d2063ec1a09f9d96b97ed9a73", []},
   "waffle": {:hex, :waffle, "1.1.6", "e944b31f8a3f3b15b8ce5c6ca315cecbcbfab354c2bb83f5980c79728cf422c0", [:mix], [{:ex_aws, "~> 2.1", [hex: :ex_aws, repo: "hexpm", optional: true]}, {:ex_aws_s3, "~> 2.1", [hex: :ex_aws_s3, repo: "hexpm", optional: true]}, {:hackney, "~> 1.9", [hex: :hackney, repo: "hexpm", optional: false]}, {:sweet_xml, "~> 0.6", [hex: :sweet_xml, repo: "hexpm", optional: true]}], "hexpm", "deecbf205acc5b6d0bc23d3813fa384486606a50d82b803edbd29e2a46258d4d"},
-  "where": {:git, "https://github.com/bonfire-networks/where", "231049bfcab1d41470a3e77d31ef333ca6b8e932", [branch: "main"]},
+  "where": {:git, "https://github.com/bonfire-networks/untangle", "231049bfcab1d41470a3e77d31ef333ca6b8e932", [branch: "main"]},
 }
