@@ -4,7 +4,8 @@ defmodule Bonfire.OpenID.Web.Openid.JwksController do
 
   alias Bonfire.OpenID.Web.OpenidView
 
-  def openid_module, do: Application.get_env(:bonfire_open_id, :openid_module, Boruta.Openid)
+  def openid_module,
+    do: Application.get_env(:bonfire_open_id, :openid_module, Boruta.Openid)
 
   def jwks_index(conn, _params) do
     openid_module().jwks(conn, __MODULE__)

@@ -19,11 +19,13 @@ defmodule Bonfire.OpenID.Integration do
 
   defp get_user(id_or_username) do
     with {:ok, user} <- Users.get_current(id_or_username) do
-      {:ok, %ResourceOwner{
-        sub: to_string(user.id),
-        username: user.character.username,
-        last_login_at: nil # TODO
-      }}
+      {:ok,
+       %ResourceOwner{
+         sub: to_string(user.id),
+         username: user.character.username,
+         # TODO
+         last_login_at: nil
+       }}
     else
       _ -> {:error, "User not found."}
     end
@@ -31,7 +33,10 @@ defmodule Bonfire.OpenID.Integration do
 
   @impl Boruta.Oauth.ResourceOwners
   def check_password(resource_owner, password) do
-    case Accounts.login(%{email_or_username: resource_owner.username, password: password}) do
+    case Accounts.login(%{
+           email_or_username: resource_owner.username,
+           password: password
+         }) do
       {:ok, account, user} -> :ok
       _ -> {:error, "Invalid email or password."}
     end

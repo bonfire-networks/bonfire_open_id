@@ -7,10 +7,11 @@ defmodule Bonfire.OpenID.Web.Oauth.IntrospectController do
   alias Boruta.Oauth.IntrospectResponse
   alias Bonfire.OpenID.Web.OauthView
 
-  def oauth_module, do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
+  def oauth_module,
+    do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def introspect(%Plug.Conn{} = conn, _params) do
-    conn |> oauth_module().introspect(__MODULE__)
+    oauth_module().introspect(conn, __MODULE__)
   end
 
   @impl Boruta.Oauth.IntrospectApplication

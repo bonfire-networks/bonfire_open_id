@@ -1,5 +1,4 @@
 defmodule Bonfire.OpenID.Fake do
-
   alias Bonfire.Me.Fake, as: MeFake
 
   # import Bonfire.OpenID.Integration
@@ -7,5 +6,4 @@ defmodule Bonfire.OpenID.Fake do
   defdelegate fake_account!(attrs \\ %{}, opts \\ []), to: MeFake
 
   defdelegate fake_user!(attrs \\ %{}, opts \\ []), to: MeFake
-
 end

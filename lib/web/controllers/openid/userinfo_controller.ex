@@ -4,7 +4,8 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
 
   alias Bonfire.OpenID.Web.OpenidView
 
-  def openid_module, do: Application.get_env(:bonfire_open_id, :openid_module, Boruta.Openid)
+  def openid_module,
+    do: Application.get_env(:bonfire_open_id, :openid_module, Boruta.Openid)
 
   def userinfo(conn, _params) do
     openid_module().userinfo(conn, __MODULE__)

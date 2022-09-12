@@ -7,11 +7,11 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   alias Boruta.Oauth.TokenResponse
   alias Bonfire.OpenID.Web.OauthView
 
-  def oauth_module, do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
+  def oauth_module,
+    do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def token(%Plug.Conn{} = conn, _params) do
-    conn
-    |> oauth_module().token(__MODULE__)
+    oauth_module().token(conn, __MODULE__)
   end
 
   @impl Boruta.Oauth.TokenApplication
@@ -24,7 +24,11 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   end
 
   @impl Boruta.Oauth.TokenApplication
-  def token_error(conn, %Error{status: status, error: error, error_description: error_description}) do
+  def token_error(conn, %Error{
+        status: status,
+        error: error,
+        error_description: error_description
+      }) do
     conn
     |> put_status(status)
     |> put_view(OauthView)

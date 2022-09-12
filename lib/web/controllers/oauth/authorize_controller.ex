@@ -8,7 +8,8 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   alias Boruta.Oauth.ResourceOwner
   alias Bonfire.OpenID.Web.OauthView
 
-  def oauth_module, do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
+  def oauth_module,
+    do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, _params) do
     current_user = conn.assigns[:current_user]
@@ -21,9 +22,12 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   end
 
   defp authorize_response(conn, %_{} = current_user) do
-    conn
-    |> oauth_module().authorize(
-      %ResourceOwner{sub: to_string(current_user.id), username: e(current_user, :character, :username, e(current_user, :email, nil))},
+    oauth_module().authorize(
+      conn,
+      %ResourceOwner{
+        sub: to_string(current_user.id),
+        username: e(current_user, :character, :username, e(current_user, :email, nil))
+      },
       __MODULE__
     )
   end
@@ -53,13 +57,18 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         %Error{format: format} = error
       )
       when not is_nil(format) do
-    conn
-    |> redirect(external: Error.redirect_to_url(error))
+    redirect(conn,
+      external: Error.redirect_to_url(error)
+    )
   end
 
   def authorize_error(
         conn,
-        %Error{status: status, error: error, error_description: error_description}
+        %Error{
+          status: status,
+          error: error,
+          error_description: error_description
+        }
       ) do
     conn
     |> put_status(status)
@@ -74,13 +83,13 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   def preauthorize_error(_conn, _response), do: :ok
 
   defp store_go(conn) do
-    conn
-    |> put_session(
+    put_session(
+      conn,
       :go,
       current_path(conn)
     )
   end
 
-  defdelegate redirect_to_login(conn), to: Bonfire.OpenID.Web.Openid.AuthorizeController
-
+  defdelegate redirect_to_login(conn),
+    to: Bonfire.OpenID.Web.Openid.AuthorizeController
 end

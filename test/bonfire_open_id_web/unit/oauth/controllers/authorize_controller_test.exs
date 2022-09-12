@@ -13,8 +13,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
 
   setup do
     conn =
-      %{build_conn() | query_params: %{}}
-      |> init_test_session(%{})
+      init_test_session(
+        %{build_conn() | query_params: %{}},
+        %{}
+      )
 
     {:ok, conn: conn}
   end

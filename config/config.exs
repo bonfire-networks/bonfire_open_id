@@ -10,7 +10,6 @@ import Config
 # include all used Bonfire extensions
 import_config "bonfire_open_id.exs"
 
-
 #### Basic configuration
 
 # You probably won't want to touch these. You might override some in
@@ -31,6 +30,7 @@ config :bonfire_common, :otp_app, :bonfire_open_id
 config :bonfire_open_id, :repo_module, Bonfire.Common.Repo
 config :bonfire_open_id, ecto_repos: [Bonfire.Common.Repo]
 config :bonfire_open_id, :localisation_path, "priv/localisation"
+
 config :bonfire_data_identity, Bonfire.Data.Identity.Credential, hasher_module: Argon2
 
 # import_config "#{Mix.env()}.exs"

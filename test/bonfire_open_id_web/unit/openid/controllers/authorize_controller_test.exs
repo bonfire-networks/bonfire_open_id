@@ -13,8 +13,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
 
   setup do
     conn =
-      %{build_conn() | query_params: %{}}
-      |> init_test_session(%{})
+      init_test_session(
+        %{build_conn() | query_params: %{}},
+        %{}
+      )
 
     {:ok, conn: conn}
   end
@@ -49,8 +51,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
       assert_authorize_redirected_to_login(conn)
     end
 
-    test "redirects_to an error if prompt=none and user not logged in", %{conn: conn} do
-      conn = %{conn|query_params: %{"prompt" => "none"}}
+    test "redirects_to an error if prompt=none and user not logged in", %{
+      conn: conn
+    } do
+      conn = %{conn | query_params: %{"prompt" => "none"}}
 
       error = %Error{
         status: :unauthorized,
@@ -69,8 +73,11 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
       assert redirected_to(conn) =~ ~r/error=login_required/
     end
 
-    @tag :fixme # need to implement last_login_at
-    test "redirects to login if user is logged in and max age is expired", %{conn: conn} do
+    # need to implement last_login_at
+    @tag :fixme
+    test "redirects to login if user is logged in and max age is expired", %{
+      conn: conn
+    } do
       current_user = %User{last_login_at: DateTime.utc_now()}
       conn = assign(conn, :current_user, current_user)
       conn = %{conn | query_params: %{"max_age" => "0"}}
@@ -78,7 +85,9 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
       assert_authorize_user_logged_out(conn)
     end
 
-    test "authorizes if user is logged in and max age is not expired", %{conn: conn} do
+    test "authorizes if user is logged in and max age is not expired", %{
+      conn: conn
+    } do
       current_user = %User{last_login_at: DateTime.utc_now()}
       conn = assign(conn, :current_user, current_user)
       conn = %{conn | query_params: %{"max_age" => "10"}}
@@ -123,6 +132,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
       conn = AuthorizeController.authorize(conn, %{})
 
       assert html_response(conn, 400) =~ ~r/Error description/
+
       # assert html_response(conn, 400) =~ ~r/Request is not a valid/
     end
 

@@ -16,7 +16,11 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
 
   describe "userinfo/2" do
     test "returns an error if unauthorized", %{conn: conn} do
-      error = %Error{status: :bad_request, error: :error, error_description: "error_description"}
+      error = %Error{
+        status: :bad_request,
+        error: :error,
+        error_description: "error_description"
+      }
 
       Boruta.OpenidMock
       |> expect(:userinfo, fn conn, module ->
@@ -26,7 +30,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
       conn = UserinfoController.userinfo(conn, %{})
 
       assert response(conn, 401)
-      assert Plug.Conn.get_resp_header(conn, "www-authenticate") == ["error=\"#{error.error}\", error_description=\"#{error.error_description}\""]
+
+      assert Plug.Conn.get_resp_header(conn, "www-authenticate") == [
+               "error=\"#{error.error}\", error_description=\"#{error.error_description}\""
+             ]
     end
 
     test "returns userinfo response", %{conn: conn} do
@@ -48,8 +55,20 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
 
   def jwk_keys_fixture do
     [
-      %{"kid" => "1", "e" => "AQAB", "kty" => "RSA", "n" => "1PaP_gbXix5itjRCaegvI_B3aFOeoxlwPPLvfLHGA4QfDmVOf8cU8OuZFAYzLArW3PnnwWWy39nVJOx42QRVGCGdUCmV7shDHRsr86-2DlL7pwUa9QyHsTj84fAJn2Fv9h9mqrIvUzAtEYRlGFvjVTGCwzEullpsB0GJafopUTFby8WdSq3dGLJBB1r-Q8QtZnAxxvolhwOmYkBkkidefmm48X7hFXL2cSJm2G7wQyinOey_U8xDZ68mgTakiqS2RtjnFD0dnpBl5CYTe4s6oZKEyFiFNiW4KkR1GVjsKwY9oC2tpyQ0AEUMvk9T9VdIltSIiAvOKlwFzL49cgwZDw"},
-      %{"kid" => "2", "e" => "AQAB", "kty" => "RSA", "n" => "1PaP_gbXix5itjRCaegvI_B3aFOeoxlwPPLvfLHGA4QfDmVOf8cU8OuZFAYzLArW3PnnwWWy39nVJOx42QRVGCGdUCmV7shDHRsr86-2DlL7pwUa9QyHsTj84fAJn2Fv9h9mqrIvUzAtEYRlGFvjVTGCwzEullpsB0GJafopUTFby8WdSq3dGLJBB1r-Q8QtZnAxxvolhwOmYkBkkidefmm48X7hFXL2cSJm2G7wQyinOey_U8xDZ68mgTakiqS2RtjnFD0dnpBl5CYTe4s6oZKEyFiFNiW4KkR1GVjsKwY9oC2tpyQ0AEUMvk9T9VdIltSIiAvOKlwFzL49cgwZDw"}
+      %{
+        "kid" => "1",
+        "e" => "AQAB",
+        "kty" => "RSA",
+        "n" =>
+          "1PaP_gbXix5itjRCaegvI_B3aFOeoxlwPPLvfLHGA4QfDmVOf8cU8OuZFAYzLArW3PnnwWWy39nVJOx42QRVGCGdUCmV7shDHRsr86-2DlL7pwUa9QyHsTj84fAJn2Fv9h9mqrIvUzAtEYRlGFvjVTGCwzEullpsB0GJafopUTFby8WdSq3dGLJBB1r-Q8QtZnAxxvolhwOmYkBkkidefmm48X7hFXL2cSJm2G7wQyinOey_U8xDZ68mgTakiqS2RtjnFD0dnpBl5CYTe4s6oZKEyFiFNiW4KkR1GVjsKwY9oC2tpyQ0AEUMvk9T9VdIltSIiAvOKlwFzL49cgwZDw"
+      },
+      %{
+        "kid" => "2",
+        "e" => "AQAB",
+        "kty" => "RSA",
+        "n" =>
+          "1PaP_gbXix5itjRCaegvI_B3aFOeoxlwPPLvfLHGA4QfDmVOf8cU8OuZFAYzLArW3PnnwWWy39nVJOx42QRVGCGdUCmV7shDHRsr86-2DlL7pwUa9QyHsTj84fAJn2Fv9h9mqrIvUzAtEYRlGFvjVTGCwzEullpsB0GJafopUTFby8WdSq3dGLJBB1r-Q8QtZnAxxvolhwOmYkBkkidefmm48X7hFXL2cSJm2G7wQyinOey_U8xDZ68mgTakiqS2RtjnFD0dnpBl5CYTe4s6oZKEyFiFNiW4KkR1GVjsKwY9oC2tpyQ0AEUMvk9T9VdIltSIiAvOKlwFzL49cgwZDw"
+      }
     ]
   end
 end

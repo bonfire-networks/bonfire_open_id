@@ -4,7 +4,9 @@ defmodule Bonfire.OpenID.Application do
 
   def start(_type, _args) do
     children = [
-      worker(OpenIDConnect.Worker, [Application.get_env(:bonfire_open_id, :openid_connect_providers, [])]),
+      worker(OpenIDConnect.Worker, [
+        Application.get_env(:bonfire_open_id, :openid_connect_providers, [])
+      ])
     ]
 
     opts = [strategy: :one_for_one, name: Bonfire.OpenID.Supervisor]

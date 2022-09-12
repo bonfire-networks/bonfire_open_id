@@ -7,7 +7,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   alias Boruta.Oauth.ResourceOwner
   alias Bonfire.OpenID.Web.OauthView
 
-  def oauth_module, do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
+  def oauth_module,
+    do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, _params) do
     conn =
@@ -59,7 +60,11 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
   def authorize_error(
         conn,
-        %Error{status: status, error: error, error_description: error_description}
+        %Error{
+          status: status,
+          error: error,
+          error_description: error_description
+        }
       ) do
     conn
     |> put_status(status)
@@ -83,8 +88,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
   defp store_go(conn) do
     # remove prompt and max_age params affecting redirections
-    conn
-    |> put_session(
+    put_session(
+      conn,
       :go,
       current_path(conn)
       |> String.replace(~r/prompt=(login|none)/, "")
@@ -111,10 +116,12 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     end
   end
 
-  defp max_age_redirection(%Plug.Conn{} = conn, _resource_owner), do: {:unchanged, conn}
+  defp max_age_redirection(%Plug.Conn{} = conn, _resource_owner),
+    do: {:unchanged, conn}
 
-  defp login_expired?(%ResourceOwner{last_login_at: last_login_at}, max_age) when not is_nil(last_login_at) do
-    now = DateTime.utc_now() |> DateTime.to_unix()
+  defp login_expired?(%ResourceOwner{last_login_at: last_login_at}, max_age)
+       when not is_nil(last_login_at) do
+    now = DateTime.to_unix(DateTime.utc_now())
 
     with {max_age, _} <- Integer.parse("#{max_age}"),
          true <- now - DateTime.to_unix(last_login_at) >= max_age do
@@ -123,8 +130,10 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
       _ -> false
     end
   end
+
   defp login_expired?(_, _) do
-    false # FIXME
+    # FIXME
+    false
   end
 
   defp login_redirection(%Plug.Conn{assigns: %{current_user: _current_user}} = conn) do
@@ -148,7 +157,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %ResourceOwner{
           sub: to_string(current_user.id),
           username: e(current_user, :character, :username, e(current_user, :email, nil)),
-          last_login_at: nil # TODO
+          # TODO
+          last_login_at: nil
         }
     end
   end
