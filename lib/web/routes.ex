@@ -1,4 +1,6 @@
 defmodule Bonfire.OpenID.Web.Routes do
+  def declare_routes, do: nil
+
   defmacro __using__(_) do
     quote do
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
