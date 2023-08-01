@@ -44,7 +44,7 @@ defmodule Bonfire.OpenID.Web.Routes do
         pipe_through([:browser])
 
         # make sure to comment in prod!
-        get("/test", ClientController, :attempt_login_or_create)
+        # get("/test", ClientController, :attempt_login_or_create)
 
         get(":provider", ClientController, :create)
       end
