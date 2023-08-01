@@ -5,7 +5,7 @@ defmodule Bonfire.OpenID.Application do
   def start(_type, _args) do
     children = [
       worker(OpenIDConnect.Worker, [
-        Application.get_env(:bonfire_open_id, :openid_connect_providers, [])
+        Bonfire.OpenID.OpenIDConnect.providers()
       ])
     ]
 
