@@ -23,7 +23,7 @@ defmodule Bonfire.OpenID.Integration do
        %ResourceOwner{
          sub: to_string(user.id),
          username: user.character.username,
-         # TODO
+         # TODO include email, etc?
          last_login_at: nil
        }}
     else

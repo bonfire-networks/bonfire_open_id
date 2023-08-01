@@ -14,25 +14,23 @@ defmodule Bonfire.OpenID.RuntimeConfig do
       disabled: false
 
     config :boruta, Boruta.Oauth,
-      issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org") 
+      issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org")
 
-  case System.get_env("OPENID_1_CLIENT_SECRET") do
-                    nil ->
-                    secret ->
+    case System.get_env("OPENID_1_DISCOVERY") do
+      nil ->
+        nil
 
-                       config :bonfire_open_id, :openid_connect_providers,
-    main: [
-      display_name: System.get_env("OPENID_1_DISPLAY_NAME"),
-      discovery_document_uri: System.get_env("OPENID_1_DISCOVERY", "https://bonfire.cafe/.well-known/openid-configuration"),
-      client_id: System.get_env("OPENID_1_CLIENT_ID"),
-      client_secret: secret,
-      redirect_uri: System.get_env("OPENID_1_REDIRECT"),
-      response_type: System.get_env("OPENID_1_RESPONSE_TYPE", "code"),
-      scope: System.get_env("OPENID_1_SCOPE", "identity data:public")
-    ]
-
-     end
-
-    
+      discovery_document_uri ->
+        config :bonfire_open_id, :openid_connect_providers,
+          main: [
+            display_name: System.get_env("OPENID_1_DISPLAY_NAME", "Single sign-on"),
+            discovery_document_uri: discovery_document_uri,
+            client_id: System.get_env("OPENID_1_CLIENT_ID"),
+            client_secret: System.get_env("OPENID_1_CLIENT_SECRET"),
+            redirect_uri: "/openid_client/main",
+            response_type: System.get_env("OPENID_1_RESPONSE_TYPE", "code"),
+            scope: System.get_env("OPENID_1_SCOPE", "identity data:public")
+          ]
+    end
   end
 end
