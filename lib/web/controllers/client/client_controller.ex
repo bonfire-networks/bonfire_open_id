@@ -13,7 +13,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
       other ->
         error(other)
 
-        send_resp(conn, 401, "An error occurrent with OpenID Connect.")
+        send_resp(conn, 401, "An error occurred with OpenID Connect.")
     end
   end
 
