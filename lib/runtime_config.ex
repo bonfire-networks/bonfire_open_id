@@ -10,8 +10,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
   def config do
     import Config
 
-    config :bonfire_open_id,
-      disabled: false
+    # config :bonfire_open_id,
+    #   modularity: :disabled
 
     config :boruta, Boruta.Oauth,
       issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org")
