@@ -1,4 +1,3 @@
 bonfire_common = "https://github.com/bonfire-networks/bonfire_common#main"
 bonfire_ui_common = "https://github.com/bonfire-networks/bonfire_ui_common#main"
 bonfire_me = "https://github.com/bonfire-networks/bonfire_me#main"
-untangle = "https://github.com/bonfire-networks/untangle#main"
