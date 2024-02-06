@@ -1,4 +1,4 @@
-defmodule Bonfire.Repo.Migrations.CreateBoruta  do
+defmodule Bonfire.Repo.Migrations.CreateBoruta do
   @moduledoc false
   use Ecto.Migration
 

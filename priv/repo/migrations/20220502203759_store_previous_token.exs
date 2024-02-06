@@ -1,4 +1,4 @@
-defmodule Bonfire.Repo.Migrations.StorePreviousToken  do
+defmodule Bonfire.Repo.Migrations.StorePreviousToken do
   @moduledoc false
   use Ecto.Migration
 

@@ -1,4 +1,4 @@
-defmodule Bonfire.Repo.Migrations.ClientsPublicRevoke  do
+defmodule Bonfire.Repo.Migrations.ClientsPublicRevoke do
   @moduledoc false
   use Ecto.Migration
 

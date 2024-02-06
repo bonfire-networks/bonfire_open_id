@@ -1,4 +1,4 @@
-defmodule Bonfire.Repo.Migrations.ClientsRefreshTokens  do
+defmodule Bonfire.Repo.Migrations.ClientsRefreshTokens do
   @moduledoc false
   use Ecto.Migration
 
