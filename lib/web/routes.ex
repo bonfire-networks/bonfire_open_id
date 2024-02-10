@@ -41,7 +41,7 @@ defmodule Bonfire.OpenID.Web.Routes do
 
       scope "/openid_client", Bonfire.OpenID.Web do
         # needs current_user
-        pipe_through([:browser])
+        pipe_through([:browser, :load_current_auth])
 
         # make sure to comment in prod!
         # get("/test", ClientController, :attempt_login_or_create)
