@@ -78,6 +78,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   defp with_open_id_connect(conn, provider, params) do
+    debug(params)
     # Map.merge(params, %{"scope"=> "openid /read-public"})
     with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider, params),
          {:ok, claims} <- OpenIDConnect.verify(provider, tokens["id_token"]) do
