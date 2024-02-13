@@ -15,6 +15,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
   end
 
   describe "userinfo/2" do
+    @tag :must
     test "returns an error if unauthorized", %{conn: conn} do
       error = %Error{
         status: :bad_request,
@@ -36,6 +37,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
              ]
     end
 
+    @tag :must
     test "returns userinfo response", %{conn: conn} do
       resource_owner_claims = %{
         "sub" => "1",
