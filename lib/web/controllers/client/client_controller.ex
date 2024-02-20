@@ -79,15 +79,31 @@ defmodule Bonfire.OpenID.Web.ClientController do
 
   defp with_open_id_connect(conn, provider, params) do
     debug(params)
+    error_msg = l("An unknown error occurred with OpenID Connect.")
     # Map.merge(params, %{"scope"=> "openid /read-public"})
     with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider, params),
          {:ok, claims} <- OpenIDConnect.verify(provider, tokens["id_token"]) do
       process_open_id_connect(conn, provider, Enum.into(claims, tokens))
     else
-      other ->
-        error(other)
+      {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
+        case Jason.decode(body) do
+          {:ok, %{"error_description" => e} = body} ->
+            error(body, error_msg)
+            send_resp(conn, 401, e)
 
-        send_resp(conn, 401, l("An error occurred with OpenID Connect."))
+          {:ok, %{"error" => e} = body} ->
+            error(body, error_msg)
+            send_resp(conn, 401, e)
+
+          {:ok, _} = body ->
+            error(body, error_msg)
+            send_resp(conn, 401, error_msg)
+        end
+
+      other ->
+        error(other, error_msg)
+
+        send_resp(conn, 401, error_msg)
     end
   end
 
