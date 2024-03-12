@@ -116,7 +116,8 @@ defmodule Bonfire.OpenID.Web.ClientController do
       with {:ok, _obj} <-
              maybe_apply(Bonfire.Social.Graph.Aliases, :add, [
                current_user,
-               {:provider, provider, params}
+               {:provider, provider, params},
+               update_existing: true
              ]) do
         redirect(conn, to: "/user")
       else
