@@ -2,7 +2,7 @@
   {#match providers when is_list(providers) and providers != []}
     <span class="text-sm">{@label || l("Sign in with an external account")}</span>
     {#for {name, url} <- providers}
-      <Link to={url} class="btn btn-primary btn-outline  !border-primary/30 w-full mt-2 mb-4">{l("Sign with ")}{name}</Link>
+      <Link to={url} class="btn btn-primary btn-outline  !border-primary/30 w-full mt-2 mb-4">{l("Sign in with ")}{name}</Link>
     {/for}
     <div class="divider">{l("or")}</div>
   {#match _}
