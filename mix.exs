@@ -24,7 +24,7 @@ defmodule Bonfire.OpenID.MixProject do
 
   def application do
     [
-      mod: {Bonfire.OpenID.Application, []},
+      # mod: {Bonfire.OpenID.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
