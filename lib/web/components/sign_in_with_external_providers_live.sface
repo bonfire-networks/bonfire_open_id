@@ -1,8 +1,8 @@
 {#case maybe_apply(Bonfire.OpenID.Client, :providers_authorization_urls, [], fallback_return: nil)}
   {#match providers when is_list(providers) and providers != []}
     <span class="text-sm">{@label || l("Sign in with an external account")}</span>
-    {#for {name, url} <- providers}
-      <Link to={url} class="btn btn-primary btn-outline  !border-primary/30 w-full mt-2 mb-4">{l("Sign in with ")}{name}</Link>
+    {#for {name, url} when is_binary(url) <- providers}
+      <LinkLive to={url} class="btn btn-primary btn-outline  !border-primary/30 w-full mt-2 mb-4">{l("Sign in with ")}{name || "external service"}</LinkLive>
     {/for}
     <div class="divider">{l("or")}</div>
   {#match _}
