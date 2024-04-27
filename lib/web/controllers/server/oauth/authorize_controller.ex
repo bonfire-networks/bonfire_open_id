@@ -12,27 +12,31 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, _params) do
-    current_user = conn.assigns[:current_user]
+    agent = current_user(conn) || current_account(conn)
     conn = store_go(conn)
 
     authorize_response(
       conn,
-      current_user
+      agent
     )
   end
 
-  defp authorize_response(conn, %_{} = current_user) do
-    oauth_module().authorize(
+  defp authorize_response(conn, %_{} = agent) do
+    %ResourceOwner{
+      sub: to_string(agent.id),
+      username: e(agent, :character, :username, nil) || e(agent, :email, :email_address, nil)
+    }
+    |> debug()
+    |> oauth_module().authorize(
       conn,
-      %ResourceOwner{
-        sub: to_string(current_user.id),
-        username: e(current_user, :character, :username, e(current_user, :email, nil))
-      },
+      ...,
       __MODULE__
     )
+    |> debug()
   end
 
-  defp authorize_response(conn, _params) do
+  defp authorize_response(conn, other) do
+    warn(other, "no agent in conn")
     redirect_to_login(conn)
   end
 
@@ -41,14 +45,25 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         conn,
         %AuthorizeResponse{} = response
       ) do
-    redirect(conn, external: AuthorizeResponse.redirect_to_url(response))
+    redirect(conn, external: AuthorizeResponse.redirect_to_url(response) |> debug())
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
   def authorize_error(
-        %Plug.Conn{} = conn,
-        %Error{status: :unauthorized}
+        conn,
+        %Error{status: :unauthorized, error: :invalid_client} = error
       ) do
+    authorize_error(
+      conn,
+      %{error | status: :bad_request}
+    )
+  end
+
+  def authorize_error(
+        %Plug.Conn{} = conn,
+        %Error{status: :unauthorized} = error
+      ) do
+    error(error)
     redirect_to_login(conn)
   end
 
@@ -57,6 +72,8 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         %Error{format: format} = error
       )
       when not is_nil(format) do
+    error(error)
+
     redirect(conn,
       external: Error.redirect_to_url(error)
     )
@@ -66,14 +83,16 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         conn,
         %Error{
           status: status,
-          error: error,
+          error: error_detail,
           error_description: error_description
-        }
+        } = error
       ) do
+    error(error)
+
     conn
     |> put_status(status)
     |> put_view(OauthView)
-    |> render("error.html", error: error, error_description: error_description)
+    |> render("error.html", error: error_detail, error_description: error_description)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication

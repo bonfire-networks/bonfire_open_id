@@ -1,7 +1,5 @@
 defmodule Bonfire.OpenID.Integration do
-  import Untangle
-  alias Bonfire.Common.Config
-  alias Bonfire.Common.Utils
+  use Bonfire.Common.Utils
   alias Bonfire.Me.Users
   alias Bonfire.Me.Accounts
   alias Boruta.Oauth.ResourceOwner
@@ -18,7 +16,7 @@ defmodule Bonfire.OpenID.Integration do
   end
 
   defp get_user(id_or_username) do
-    with {:ok, user} <- Users.get_current(id_or_username) do
+    with %{} = user <- Users.get_current(id_or_username) do
       {:ok,
        %ResourceOwner{
          sub: to_string(user.id),
@@ -27,7 +25,8 @@ defmodule Bonfire.OpenID.Integration do
          last_login_at: nil
        }}
     else
-      _ -> {:error, "User not found."}
+      _ ->
+        error(id_or_username, l("User not found."))
     end
   end
 
@@ -37,8 +36,11 @@ defmodule Bonfire.OpenID.Integration do
            email_or_username: resource_owner.username,
            password: password
          }) do
-      {:ok, account, user} -> :ok
-      _ -> {:error, "Invalid email or password."}
+      {:ok, account, user} ->
+        :ok
+
+      _ ->
+        error(resource_owner, l("Invalid email or password."))
     end
   end
 

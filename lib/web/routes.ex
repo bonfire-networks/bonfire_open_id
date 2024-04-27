@@ -12,7 +12,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/openid", Bonfire.OpenID.Web.Openid do
-        pipe_through([:basic])
+        pipe_through([:basic, :load_current_auth])
 
         get("/userinfo", UserinfoController, :userinfo)
         post("/userinfo", UserinfoController, :userinfo)
@@ -26,21 +26,19 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
-        # needs current_user
-        pipe_through([:browser])
+        pipe_through([:basic, :load_current_auth])
 
         get("/authorize", AuthorizeController, :authorize)
+        get("/ready", ReadyController, :ready)
       end
 
       scope "/openid", Bonfire.OpenID.Web.Openid do
-        # needs current_user
-        pipe_through([:browser])
+        pipe_through([:basic, :load_current_auth])
 
         get("/authorize", AuthorizeController, :authorize)
       end
 
       scope "/openid_client", Bonfire.OpenID.Web do
-        # needs current_user
         pipe_through([:browser, :load_current_auth])
 
         # make sure to comment in prod!

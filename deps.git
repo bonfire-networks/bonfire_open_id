@@ -2,3 +2,5 @@ bonfire_common = "https://github.com/bonfire-networks/bonfire_common"
 bonfire_ui_common = "https://github.com/bonfire-networks/bonfire_ui_common"
 bonfire_me = "https://github.com/bonfire-networks/bonfire_me"
 openid_connect = "https://github.com/DockYard/openid_connect"
+
+# ex_cldr_territories = "https://github.com/elixir-cldr/cldr_territories" 
