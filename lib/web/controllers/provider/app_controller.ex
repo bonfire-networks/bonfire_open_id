@@ -11,8 +11,9 @@ defmodule Bonfire.API.MastoCompatible.AppController do
     # -F 'website=https://myapp.example' \
     # https://instance.example/api/v1/apps
 
+    # TODO: don't re-create if one already exists
     with {:ok, client} <-
-           Bonfire.OpenID.Clients.new(%{
+           Bonfire.OpenID.Provider.ClientApps.new(%{
              name: String.trim("#{params["client_name"]} #{params["website"]}"),
              redirect_uris: List.wrap(params["redirect_uris"])
              # _: params["scopes"], # TODO

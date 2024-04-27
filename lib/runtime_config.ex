@@ -14,7 +14,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
     #   modularity: :disabled
 
     config :boruta, Boruta.Oauth,
-      issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org")
+      issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org"),
+      redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate}
 
     main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY")
 

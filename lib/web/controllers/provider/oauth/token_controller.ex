@@ -16,6 +16,8 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
 
   @impl Boruta.Oauth.TokenApplication
   def token_success(conn, %TokenResponse{} = response) do
+    debug(response)
+
     conn
     |> put_resp_header("pragma", "no-cache")
     |> put_resp_header("cache-control", "no-store")

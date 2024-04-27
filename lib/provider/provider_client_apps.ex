@@ -1,4 +1,4 @@
-defmodule Bonfire.OpenID.Clients do
+defmodule Bonfire.OpenID.Provider.ClientApps do
   defdelegate list_clients, to: Boruta.Ecto.Admin
   defdelegate list_scopes, to: Boruta.Ecto.Admin
   defdelegate list_active_tokens, to: Boruta.Ecto.Admin

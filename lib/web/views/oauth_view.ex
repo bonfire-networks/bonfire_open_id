@@ -15,7 +15,7 @@ defmodule Bonfire.OpenID.Web.OauthView do
       }) do
     Enum.filter(
       %{
-        token_type: token_type,
+        token_type: String.capitalize(token_type || "Bearer"),
         access_token: access_token,
         expires_in: expires_in,
         refresh_token: refresh_token,
@@ -26,7 +26,8 @@ defmodule Bonfire.OpenID.Web.OauthView do
         _ -> true
       end
     )
-    |> Enum.into(%{})
+    |> Enum.into(%{created_at: System.os_time(:second)})
+    |> debug()
   end
 
   def render("introspect.json", %{
