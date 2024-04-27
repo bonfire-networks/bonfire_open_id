@@ -26,14 +26,19 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   end
 
   @impl Boruta.Oauth.TokenApplication
-  def token_error(conn, %Error{
-        status: status,
-        error: error,
-        error_description: error_description
-      }) do
+  def token_error(
+        conn,
+        %Error{
+          status: status,
+          error: error_detail,
+          error_description: error_description
+        } = error
+      ) do
+    error(error)
+
     conn
     |> put_status(status)
     |> put_view(OauthView)
-    |> render("error.json", error: error, error_description: error_description)
+    |> render("error.json", error: error_detail, error_description: error_description)
   end
 end
