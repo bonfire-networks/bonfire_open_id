@@ -7,8 +7,8 @@ defmodule Bonfire.OpenID.Web.ClientController do
   # The `Authentication` module here is an imaginary interface for setting session state
   def create(conn, %{"provider" => provider} = params) do
     with provider when is_atom(provider) <- maybe_to_atom(provider) do
-      if Client.open_id_connect_providers()[provider] do
-        with_open_id_connect(conn, provider, params)
+      if provider_config = Client.open_id_connect_providers()[provider] do
+        with_open_id_connect(conn, provider, Map.new(provider_config), params)
       else
         if oauth2 = Client.oauth2_providers()[provider] do
           debug(oauth2)
@@ -77,12 +77,12 @@ defmodule Bonfire.OpenID.Web.ClientController do
     redirect(conn, external: "#{authorize_uri}?#{query}")
   end
 
-  defp with_open_id_connect(conn, provider, params) do
+  defp with_open_id_connect(conn, provider, provider_config, params) do
     debug(params)
     error_msg = l("An unknown error occurred with OpenID Connect.")
     # Map.merge(params, %{"scope"=> "openid /read-public"})
-    with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider, params),
-         {:ok, claims} <- OpenIDConnect.verify(provider, tokens["id_token"]) do
+    with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider_config, params),
+         {:ok, claims} <- OpenIDConnect.verify(provider_config, tokens["id_token"]) do
       process_open_id_connect(conn, provider, Enum.into(claims, tokens))
     else
       {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
@@ -99,6 +99,11 @@ defmodule Bonfire.OpenID.Web.ClientController do
             error(body, error_msg)
             send_resp(conn, 401, error_msg)
         end
+
+      # other ->
+      #   error(other, error_msg)
+
+      #   send_resp(conn, 401, error_msg)
 
       other ->
         error(other, error_msg)
