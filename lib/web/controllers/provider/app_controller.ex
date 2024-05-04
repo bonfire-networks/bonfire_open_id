@@ -2,6 +2,7 @@ defmodule Bonfire.API.MastoCompatible.AppController do
   use Bonfire.UI.Common.Web, :controller
   alias Bonfire.Common.Config
   alias Bonfire.OpenID.Web.OauthView
+  alias Bonfire.OpenID.Provider.ClientApps
 
   def create(conn, params) do
     # curl -X POST \
@@ -13,9 +14,9 @@ defmodule Bonfire.API.MastoCompatible.AppController do
 
     # TODO: don't re-create if one already exists
     with {:ok, client} <-
-           Bonfire.OpenID.Provider.ClientApps.new(%{
+           ClientApps.new(%{
              name: String.trim("#{params["client_name"]} #{params["website"]}"),
-             redirect_uris: List.wrap(params["redirect_uris"])
+             redirect_uris: ClientApps.prepare_redirect_uris(params["redirect_uris"])
              # _: params["scopes"], # TODO
            }) do
       json(conn, %{

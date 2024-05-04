@@ -81,4 +81,15 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def init_test_client_app do
     new(%{id: "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", name: "Test client app"})
   end
+
+  # def prepare_redirect_uris("com.tapbots.Ivory.19300:/request_token"<>rest) do
+  #   ["com.tapbots.Ivory.19300://request_token"<>rest]
+  # end
+  def prepare_redirect_uris(other) when is_binary(other) do
+    [other]
+  end
+
+  def prepare_redirect_uris(list) when is_list(list) do
+    Enum.flat_map(list, &prepare_redirect_uris/1)
+  end
 end
