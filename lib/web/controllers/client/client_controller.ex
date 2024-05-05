@@ -1,7 +1,7 @@
 defmodule Bonfire.OpenID.Web.ClientController do
   use Bonfire.UI.Common.Web, :controller
 
-  import Bonfire.OpenID.Integration
+  import Bonfire.OpenID
   alias Bonfire.OpenID.Client
 
   # The `Authentication` module here is an imaginary interface for setting session state

@@ -1,4 +1,6 @@
-defmodule Bonfire.OpenID.Integration do
+defmodule Bonfire.OpenID do
+  @moduledoc "./README.md" |> File.stream!() |> Enum.drop(1) |> Enum.join()
+
   use Bonfire.Common.Utils
   alias Bonfire.Me.Users
   alias Bonfire.Me.Accounts

@@ -4,7 +4,7 @@ defmodule Bonfire.OpenID.Test.FakeHelpers do
   # alias Bonfire.OpenID.{Accounts, Users}
   # import ExUnit.Assertions
 
-  # import Bonfire.OpenID.Integration
+  # import Bonfire.OpenID
 
   # import Bonfire.OpenID.Fake
 end

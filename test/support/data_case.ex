@@ -15,7 +15,7 @@ defmodule Bonfire.OpenID.DataCase do
   """
 
   use ExUnit.CaseTemplate
-  # import Bonfire.OpenID.Integration
+  # import Bonfire.OpenID
 
   using do
     quote do

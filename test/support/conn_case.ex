@@ -41,7 +41,7 @@ defmodule Bonfire.OpenID.ConnCase do
   end
 
   setup tags do
-    # import Bonfire.OpenID.Integration
+    # import Bonfire.OpenID
 
     Bonfire.Common.Test.Interactive.setup_test_repo(tags)
 
