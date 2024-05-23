@@ -3,8 +3,10 @@ defmodule Bonfire.OpenID.Web.Routes do
 
   defmacro __using__(_) do
     quote do
+      import Bonfire.OpenID.Plugs.ClientID
+
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
-        pipe_through([:basic])
+        pipe_through([:basic, :validate_client_id])
 
         post("/revoke", RevokeController, :revoke)
         post("/token", TokenController, :token)
@@ -26,7 +28,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
-        pipe_through([:basic, :load_current_auth])
+        pipe_through([:basic, :load_current_auth, :validate_client_id])
 
         get("/authorize", AuthorizeController, :authorize)
         get("/ready", ReadyController, :ready)

@@ -1,7 +1,5 @@
 defmodule Bonfire.OpenID.Plugs.AuthRequired do
-  import Plug
-
-  use Bonfire.UI.Common.Web, :controller
+  use Bonfire.UI.Common.Web, :plug
 
   def require_auth(conn, _opts) do
     Bonfire.OpenID.Plugs.Authorize.maybe_load_authorization(conn) ||

@@ -35,6 +35,7 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
         } = error
       ) do
     error(error)
+    debug(conn)
 
     conn
     |> put_status(status)

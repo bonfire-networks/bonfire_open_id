@@ -74,7 +74,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
         redirect_uri: redirect_uri
       })
 
-    redirect(conn, external: "#{authorize_uri}?#{query}")
+    redirect_to(conn, "#{authorize_uri}?#{query}")
   end
 
   defp with_open_id_connect(conn, provider, provider_config, params) do
@@ -124,7 +124,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
                {:provider, provider, params},
                update_existing: true
              ]) do
-        redirect(conn, to: "/user")
+        redirect_to(conn, "/user")
       else
         e ->
           msg = l("An error occurred saving the external authentication.")

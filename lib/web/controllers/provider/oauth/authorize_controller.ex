@@ -21,12 +21,20 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     )
   end
 
+  def from_query_string(conn, query) do
+    query_params =
+      Plug.Conn.Query.decode(query)
+      |> debug()
+
+    authorize(%{conn | query_params: query_params}, query_params)
+  end
+
   defp authorize_response(conn, %_{} = agent) do
     %ResourceOwner{
       sub: to_string(agent.id),
       username: e(agent, :character, :username, nil) || e(agent, :email, :email_address, nil)
     }
-    |> debug()
+    # |> debug()
     |> oauth_module().authorize(
       conn,
       ...,
@@ -45,7 +53,13 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         conn,
         %AuthorizeResponse{} = response
       ) do
-    redirect(conn, external: AuthorizeResponse.redirect_to_url(response) |> debug())
+    conn
+    # |> Plug.Conn.put_status(303) # to support redirect after a POST
+    |> redirect_to(
+      AuthorizeResponse.redirect_to_url(response)
+      |> debug(),
+      :maybe_external
+    )
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -74,8 +88,10 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
       when not is_nil(format) do
     error(error)
 
-    redirect(conn,
-      external: Error.redirect_to_url(error)
+    redirect_to(
+      conn,
+      Error.redirect_to_url(error),
+      :maybe_external
     )
   end
 

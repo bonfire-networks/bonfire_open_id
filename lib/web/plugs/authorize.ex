@@ -1,7 +1,5 @@
 defmodule Bonfire.OpenID.Plugs.Authorize do
-  import Plug
-
-  use Bonfire.UI.Common.Web, :controller
+  use Bonfire.UI.Common.Web, :plug
 
   alias Boruta.Oauth.Authorization.AccessToken
   alias Boruta.Oauth.Scope

@@ -1,7 +1,37 @@
 defmodule Bonfire.OpenID.Provider.ClientApps do
+  use Bonfire.Common.Repo
+
   defdelegate list_clients, to: Boruta.Ecto.Admin
   defdelegate list_scopes, to: Boruta.Ecto.Admin
   defdelegate list_active_tokens, to: Boruta.Ecto.Admin
+
+  def get_or_new(name, redirect_uri) do
+    case get(name, redirect_uri) do
+      nil -> new(name, redirect_uri)
+      client -> client
+    end
+  end
+
+  def get_or_new(clauses) do
+    case get(clauses) do
+      nil -> new(Map.new(clauses))
+      client -> client
+    end
+  end
+
+  def get(name, redirect_uri) do
+    repo().one(
+      from c in Boruta.Ecto.Client, where: ^name == c.name and ^redirect_uri in c.redirect_uris
+    )
+  end
+
+  def get(id: id) do
+    Boruta.Oauth.Clients.get_client(id)
+  end
+
+  def get(clauses) do
+    repo().get_by(Boruta.Ecto.Client, clauses)
+  end
 
   @doc "Define an OAuth client app, providing a name and redirect URI(s)"
   def new(name, redirect_uris)
@@ -82,14 +112,16 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     new(%{id: "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", name: "Test client app"})
   end
 
-  # def prepare_redirect_uris("com.tapbots.Ivory.19300:/request_token"<>rest) do
-  #   ["com.tapbots.Ivory.19300://request_token"<>rest]
-  # end
   def prepare_redirect_uris(other) when is_binary(other) do
-    [other]
+    [prepare_redirect_uri(other)]
   end
 
   def prepare_redirect_uris(list) when is_list(list) do
-    Enum.flat_map(list, &prepare_redirect_uris/1)
+    Enum.map(list, &prepare_redirect_uri/1)
   end
+
+  # def prepare_redirect_uri("com.tapbots.Ivory.19300:/request_token"<>rest) do
+  #   "com.tapbots.Ivory.19300://request_token"<>rest
+  # end
+  def prepare_redirect_uri(uri), do: uri
 end

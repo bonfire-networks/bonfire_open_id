@@ -30,7 +30,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         conn,
         %AuthorizeResponse{} = response
       ) do
-    redirect(conn, external: AuthorizeResponse.redirect_to_url(response))
+    redirect_to(conn, AuthorizeResponse.redirect_to_url(response), :maybe_external)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -38,7 +38,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %Plug.Conn{} = conn,
         %Error{status: :unauthorized, error: :login_required} = error
       ) do
-    redirect(conn, external: Error.redirect_to_url(error))
+    redirect_to(conn, Error.redirect_to_url(error), :maybe_external)
   end
 
   def authorize_error(
@@ -55,7 +55,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         } = error
       )
       when not is_nil(format) do
-    redirect(conn, external: Error.redirect_to_url(error))
+    redirect_to(conn, Error.redirect_to_url(error), :maybe_external)
   end
 
   def authorize_error(
@@ -166,12 +166,12 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   def redirect_to_login(conn) do
     # where to redirect in order for the user to login
     # NOTE: after successfully logged in, it should redirect to `get_session(conn, :go)`
-    redirect(conn, to: Bonfire.Common.URIs.path(:login))
+    redirect_to(conn, Bonfire.Common.URIs.path(:login))
   end
 
   defp log_out_user(conn) do
     # where to redirect in order for the user to log out
     # NOTE: after successfully logged out, it should redirect to `get_session(conn, :go)`
-    redirect(conn, to: Bonfire.Common.URIs.path(:logout))
+    redirect_to(conn, Bonfire.Common.URIs.path(:logout))
   end
 end
