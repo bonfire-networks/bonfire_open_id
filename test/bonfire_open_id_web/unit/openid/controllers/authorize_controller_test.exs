@@ -106,8 +106,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
 
       conn = AuthorizeController.authorize(conn, %{})
 
-      assert redirected_to(conn) in
-               ["http://redirect.uri#access_token=access_token&expires_in=10", "http://redirect.uri#expires_in=10&access_token=access_token"]
+      assert redirected_to(conn) in [
+               "http://redirect.uri#access_token=access_token&expires_in=10",
+               "http://redirect.uri#expires_in=10&access_token=access_token"
+             ]
     end
 
     test "redirects to user login when user not logged in", %{conn: conn} do
@@ -200,8 +202,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
 
       conn = AuthorizeController.authorize(conn, %{})
 
-      assert redirected_to(conn) in
-               ["http://redirect.uri#access_token=access_token&expires_in=10", "http://redirect.uri#expires_in=10&access_token=access_token"]
+      assert redirected_to(conn) in [
+               "http://redirect.uri#access_token=access_token&expires_in=10",
+               "http://redirect.uri#expires_in=10&access_token=access_token"
+             ]
     end
 
     test "redirects with an access_token and a state", %{conn: conn} do
@@ -223,8 +227,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
 
       conn = AuthorizeController.authorize(conn, %{})
 
-      assert redirected_to(conn) in
-               ["http://redirect.uri#access_token=access_token&expires_in=10&state=state", "http://redirect.uri#state=state&expires_in=10&access_token=access_token"]
+      assert redirected_to(conn) in [
+               "http://redirect.uri#access_token=access_token&expires_in=10&state=state",
+               "http://redirect.uri#state=state&expires_in=10&access_token=access_token"
+             ]
     end
 
     test "redirects with an code", %{conn: conn} do

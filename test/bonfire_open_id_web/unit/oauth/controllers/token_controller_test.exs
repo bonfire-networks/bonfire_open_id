@@ -55,7 +55,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.TokenControllerTest do
                "expires_in" => 10,
                "token_type" => "Token_type",
                "refresh_token" => "refresh_token"
-             } = json_response(conn, 200) 
+             } = json_response(conn, 200)
     end
   end
 end
