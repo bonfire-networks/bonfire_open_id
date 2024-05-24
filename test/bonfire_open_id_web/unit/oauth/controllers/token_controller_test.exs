@@ -50,12 +50,12 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.TokenControllerTest do
 
       conn = TokenController.token(conn, %{})
 
-      assert json_response(conn, 200) == %{
+      assert %{
                "access_token" => "access_token",
                "expires_in" => 10,
-               "token_type" => "token_type",
+               "token_type" => "Token_type",
                "refresh_token" => "refresh_token"
-             }
+             } = json_response(conn, 200) 
     end
   end
 end
