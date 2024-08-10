@@ -1,6 +1,6 @@
 faker = "~> 0.14" # fake data generation
 jason = "~> 1.0"
-boruta = "~> 2.3.3" # openid / oauth provider
+# boruta = "~> 2.3.3" # openid / oauth provider
 openid_connect = "~> 0.2.2" # openid client
 surface = "~> 0.11.4"
 untangle = "~> 0.3"
