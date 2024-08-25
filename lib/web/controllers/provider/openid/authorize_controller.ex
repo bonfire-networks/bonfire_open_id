@@ -30,7 +30,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         conn,
         %AuthorizeResponse{} = response
       ) do
-    redirect_to(conn, AuthorizeResponse.redirect_to_url(response), :maybe_external)
+    redirect_to(conn, AuthorizeResponse.redirect_to_url(response), type: :maybe_external)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -38,7 +38,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %Plug.Conn{} = conn,
         %Error{status: :unauthorized, error: :login_required} = error
       ) do
-    redirect_to(conn, Error.redirect_to_url(error), :maybe_external)
+    redirect_to(conn, Error.redirect_to_url(error), type: :maybe_external)
   end
 
   def authorize_error(
@@ -55,7 +55,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         } = error
       )
       when not is_nil(format) do
-    redirect_to(conn, Error.redirect_to_url(error), :maybe_external)
+    redirect_to(conn, Error.redirect_to_url(error), type: :maybe_external)
   end
 
   def authorize_error(

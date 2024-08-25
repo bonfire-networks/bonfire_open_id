@@ -58,7 +58,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     |> redirect_to(
       AuthorizeResponse.redirect_to_url(response)
       |> debug(),
-      :maybe_external
+      type: :maybe_external
     )
   end
 
@@ -91,7 +91,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     redirect_to(
       conn,
       Error.redirect_to_url(error),
-      :maybe_external
+      type: :maybe_external
     )
   end
 
