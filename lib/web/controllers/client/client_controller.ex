@@ -86,30 +86,45 @@ defmodule Bonfire.OpenID.Web.ClientController do
       process_open_id_connect(conn, provider, Enum.into(claims, tokens))
     else
       {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
-        case Jason.decode(body) do
-          {:ok, %{"error_description" => e} = body} ->
-            error(body, error_msg)
-            send_resp(conn, 401, e)
+        process_body_error(conn, body, error_msg)
 
-          {:ok, %{"error" => e} = body} ->
-            error(body, error_msg)
-            send_resp(conn, 401, e)
-
-          {:ok, _} = body ->
-            error(body, error_msg)
-            send_resp(conn, 401, error_msg)
-        end
-
-      # other ->
-      #   error(other, error_msg)
-
-      #   send_resp(conn, 401, error_msg)
+      {_, body} ->
+        process_body_error(conn, body, error_msg)
 
       other ->
-        error(other, error_msg)
+        process_body_error(conn, other, error_msg)
+    end
+  end
+
+  defp process_body_error(conn, body, error_msg) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, %{"error_description" => e} = body} ->
+        error(body, error_msg)
+        send_resp(conn, 401, e)
+
+      {:ok, %{"error" => e} = body} ->
+        error(body, error_msg)
+        send_resp(conn, 401, e)
+
+      {:ok, _} = body ->
+        error(body, error_msg)
+        send_resp(conn, 401, error_msg)
+
+      _ ->
+        error(body, error_msg)
 
         send_resp(conn, 401, error_msg)
     end
+  end
+
+  defp process_body_error(conn, {_, body}, error_msg) do
+    process_body_error(conn, body, error_msg)
+  end
+
+  defp process_body_error(conn, body, error_msg) do
+    error(body, error_msg)
+
+    send_resp(conn, 401, error_msg)
   end
 
   defp process_open_id_connect(conn, provider, params) do
