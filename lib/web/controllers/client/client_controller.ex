@@ -6,13 +6,27 @@ defmodule Bonfire.OpenID.Web.ClientController do
 
   # The `Authentication` module here is an imaginary interface for setting session state
   def create(conn, %{"provider" => provider} = params) do
+    params = Map.drop(params, ["provider"])
+
     with provider when is_atom(provider) <- maybe_to_atom(provider) do
       if provider_config = Client.open_id_connect_providers()[provider] do
-        with_open_id_connect(conn, provider, Map.new(provider_config), params)
+        #  redirect to authorization URL
+        if params == %{} do
+          redirect_to(conn, openid_provider_url(provider, provider_config), type: :maybe_external)
+        else
+          with_open_id_connect(conn, provider, Map.new(provider_config), params)
+        end
       else
-        if oauth2 = Client.oauth2_providers()[provider] do
-          debug(oauth2)
-          with_oauth2(conn, Map.new(oauth2), params)
+        if provider_config = Client.oauth2_providers()[provider] do
+          debug(provider_config)
+          #  redirect to authorization URL
+          if params == %{} do
+            redirect_to(conn, oauth_provider_url(provider, provider_config),
+              type: :maybe_external
+            )
+          else
+            with_oauth2(conn, Map.new(provider_config), params)
+          end
         else
           send_resp(conn, 401, "Provider not recognised.")
         end
@@ -25,6 +39,41 @@ defmodule Bonfire.OpenID.Web.ClientController do
     end
   end
 
+  def oauth_provider_url(provider, config \\ nil) do
+    config = config || Client.oauth2_providers()[provider]
+
+    params =
+      %{
+        # Required - indicates we want an authorization code
+        "response_type" => config[:response_type] || "code",
+        # Required - the client's ID
+        "client_id" => config[:client_id],
+        # "http://localhost:4001/openid_client/test_provider", # Required - must match registered URI
+        "redirect_uri" => config[:redirect_uri],
+        # Optional - space-separated list of requested permissions
+        "scope" => config[:scope],
+        # Recommended - random string to prevent CSRF
+        "state" => Bonfire.Common.Text.random_string()
+        # "prompt" => "consent"            # Optional - force showing the consent screen
+        # "code_challenge_method" => "S256" # Optional - PKCE hash method
+        # "code_challenge" => ?, # Optional - for PKCE
+      }
+      |> URI.encode_query()
+
+    "#{config[:authorize_uri]}?#{params}"
+  end
+
+  def openid_provider_url(provider, config \\ nil) do
+    Utils.ok_unwrap(
+      Map.new(config || Client.open_id_connect_providers()[provider])
+      #  |> Map.put(:redirect_uri, "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}")
+      |> OpenIDConnect.authorization_uri(%{
+        "state" => Bonfire.Common.Text.random_string(),
+        "nonce" => Bonfire.Common.Text.random_string()
+      })
+    )
+  end
+
   defp with_oauth2(
          conn,
          %{
@@ -35,8 +84,6 @@ defmodule Bonfire.OpenID.Web.ClientController do
          },
          %{"code" => code} = params
        ) do
-    debug(params, "TODO")
-
     query =
       URI.encode_query(%{
         code: code,
@@ -48,9 +95,9 @@ defmodule Bonfire.OpenID.Web.ClientController do
     with {:ok, %{body: result}} <- Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
          %{"access_token" => access_token} = result <- URI.decode_query(result) do
       result
-      |> debug("TODO")
+      |> debug("WIP")
 
-      send_resp(conn, 401, "OK - TODO")
+      send_resp(conn, 200, "Your code: #{access_token}")
     else
       %{"error_description" => msg} = e ->
         error(e)
@@ -74,15 +121,20 @@ defmodule Bonfire.OpenID.Web.ClientController do
         redirect_uri: redirect_uri
       })
 
-    redirect_to(conn, "#{authorize_uri}?#{query}")
+    redirect_to(conn, debug("#{authorize_uri}?#{query}"), type: :maybe_external)
   end
 
   defp with_open_id_connect(conn, provider, provider_config, params) do
     debug(params)
+
+    # provider_config = provider_config
+    # |> Map.put(:redirect_uri, "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}")
+
     error_msg = l("An unknown error occurred with OpenID Connect.")
     # Map.merge(params, %{"scope"=> "openid /read-public"})
-    with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider_config, params),
-         {:ok, claims} <- OpenIDConnect.verify(provider_config, tokens["id_token"]) do
+    with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider_config, params) |> debug("tokens"),
+         {:ok, claims} <-
+           OpenIDConnect.verify(provider_config, tokens["id_token"]) |> debug("claims") do
       process_open_id_connect(conn, provider, Enum.into(claims, tokens))
     else
       {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
@@ -150,7 +202,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
       email = params["email"]
 
       with true <- is_binary(email),
-           # TODO: should check that this user has previously authenticated with this provider
+           # TODO: should check that this user has previously authenticated with this provider?
            {:ok, conn} <- Bonfire.UI.Me.LoginController.attempt(conn, %{openid_email: email}) do
         conn
       else
@@ -170,7 +222,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
                 conn,
                 401,
                 l(
-                  "The oauth provider did not indicate an email for your account, which is not currently supported unless you first sign in to your Bonfire account and then add it in your profile settings. "
+                  "The oauth provider did not indicate an email for your account, which is not currently supported unless you first sign in to your Bonfire account and then add it in your profile settings."
                 )
               )
           end

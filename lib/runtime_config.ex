@@ -17,6 +17,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
       issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org"),
       redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate}
 
+    # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082 
     main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY")
 
     if main_discovery_document_uri do
@@ -26,7 +27,6 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           discovery_document_uri: main_discovery_document_uri,
           client_id: System.get_env("OPENID_1_CLIENT_ID"),
           client_secret: System.get_env("OPENID_1_CLIENT_SECRET"),
-          redirect_uri: "#{Bonfire.Common.URIs.base_url()}/openid_client/main",
           response_type: System.get_env("OPENID_1_RESPONSE_TYPE", "code"),
           scope: System.get_env("OPENID_1_SCOPE", "identity data:public")
         ]
@@ -42,7 +42,6 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           discovery_document_uri: "https://orcid.org/.well-known/openid-configuration",
           client_id: orcid_client_id,
           client_secret: System.get_env("ORCID_CLIENT_SECRET"),
-          redirect_uri: "#{Bonfire.Common.URIs.base_url()}/openid_client/orcid",
           response_type: "code",
           scope: "openid"
         ]
@@ -57,8 +56,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
     #     client_id: github_app_client_id,
     #     client_secret: System.get_env("GITHUB_CLIENT_SECRET"),
     #     authorize_uri: "https://github.com/login/oauth/authorize",
-    #     access_token_uri: "https://github.com/login/oauth/access_token",
-    #     redirect_uri: "#{Bonfire.Common.URIs.base_url}/openid_client/github",
+    #     access_token_uri: "https://github.com/login/oauth/access_token"
     #   ]
     # end
   end

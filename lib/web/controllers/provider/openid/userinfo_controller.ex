@@ -12,9 +12,12 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
   end
 
   @impl Boruta.Openid.UserinfoApplication
+  def userinfo_fetched(conn, %{userinfo: userinfo}), do: userinfo_fetched(conn, userinfo)
+
   def userinfo_fetched(conn, userinfo) do
     conn
     |> put_view(OpenidView)
+    # TODO: add email address, username, etc?
     |> render("userinfo.json", userinfo: userinfo)
   end
 

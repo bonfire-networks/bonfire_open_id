@@ -73,8 +73,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
       assert redirected_to(conn) =~ ~r/error=login_required/
     end
 
-    # need to implement last_login_at
-    @tag :fixme
+    # @tag :fixme
     test "redirects to login if user is logged in and max age is expired", %{
       conn: conn
     } do

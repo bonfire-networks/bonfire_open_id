@@ -14,11 +14,11 @@ defmodule Bonfire.API.MastoCompatible.AppController do
 
     # TODO: don't re-create if one already exists
     with {:ok, client} <-
-           ClientApps.new(%{
-             name: String.trim("#{params["client_name"]} #{params["website"]}"),
-             redirect_uris: ClientApps.prepare_redirect_uris(params["redirect_uris"])
-             # _: params["scopes"], # TODO
-           }) do
+           ClientApps.get_or_new(
+             String.trim("#{params["client_name"]} #{params["website"]}"),
+             ClientApps.prepare_redirect_uris(params["redirect_uris"])
+             # params["scopes"] # TODO?
+           ) do
       json(conn, %{
         "id" => client.id,
         "name" => client.name,

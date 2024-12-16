@@ -1,32 +1,45 @@
 defmodule Bonfire.OpenID.Provider.ClientApps do
   use Bonfire.Common.Repo
+  import Bonfire.Common.Utils
+  alias Bonfire.Common.Enums
+  alias Bonfire.Common.Types
 
   defdelegate list_clients, to: Boruta.Ecto.Admin
   defdelegate list_scopes, to: Boruta.Ecto.Admin
   defdelegate list_active_tokens, to: Boruta.Ecto.Admin
 
-  def get_or_new(name, redirect_uri) do
-    case get(name, redirect_uri) do
-      nil -> new(name, redirect_uri)
+  def get_or_new(id_or_name, redirect_uri) do
+    case get(Types.uid(id_or_name), id_or_name, redirect_uri) do
+      nil -> ok_unwrap(new(id_or_name, redirect_uri))
       client -> client
     end
   end
 
   def get_or_new(clauses) do
     case get(clauses) do
-      nil -> new(Map.new(clauses))
+      nil -> ok_unwrap(new(Map.new(clauses)))
       client -> client
     end
   end
 
-  def get(name, redirect_uri) do
+  def get(id \\ nil, name, redirect_uri)
+
+  def get(nil, name, redirect_uri) when is_binary(redirect_uri) do
     repo().one(
       from c in Boruta.Ecto.Client, where: ^name == c.name and ^redirect_uri in c.redirect_uris
     )
   end
 
+  def get(nil, name, [redirect_uri]) when is_binary(redirect_uri) do
+    get(nil, name, redirect_uri)
+  end
+
+  def get(id, _name, _redirect_uri) do
+    repo().one(from c in Boruta.Ecto.Client, where: ^id == c.id)
+  end
+
   def get(id: id) do
-    Boruta.Oauth.Clients.get_client(id)
+    Boruta.ClientsAdapter.get_client(id)
   end
 
   def get(clauses) do
@@ -34,21 +47,25 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   end
 
   @doc "Define an OAuth client app, providing a name and redirect URI(s)"
-  def new(name, redirect_uris)
-      when is_binary(name) and is_list(redirect_uris) and
+  def new(id_or_name, redirect_uris)
+      when is_binary(id_or_name) and is_list(redirect_uris) and
              length(redirect_uris) > 0 do
-    new(%{name: name, redirect_uris: redirect_uris})
+    new(%{
+      id: Types.uid(id_or_name) || SecureRandom.uuid(),
+      name: id_or_name,
+      redirect_uris: redirect_uris
+    })
   end
 
-  def new(name, redirect_uri)
-      when is_binary(name) and is_binary(redirect_uri) do
-    new(name, [redirect_uri])
+  def new(id_or_name, redirect_uri)
+      when is_binary(id_or_name) and is_binary(redirect_uri) do
+    new(id_or_name, [redirect_uri])
   end
 
   def new(params) when is_map(params) do
     %{
       # OAuth client_id
-      id: SecureRandom.uuid(),
+      id: Types.uid(params[:id]) || SecureRandom.uuid(),
       # OAuth client_secret
       secret: SecureRandom.hex(64),
       # Display name
@@ -105,11 +122,15 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
     |> Map.merge(params)
+    # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
   end
 
-  def init_test_client_app do
-    new(%{id: "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", name: "Test client app"})
+  def init_test_client_app(id \\ "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", attrs \\ %{}) do
+    case get(id: id) do
+      nil -> new(Map.merge(%{id: id, name: "Test client app"}, attrs))
+      client -> client
+    end
   end
 
   def prepare_redirect_uris(other) when is_binary(other) do

@@ -6,6 +6,7 @@ defmodule Bonfire.OpenID do
   alias Bonfire.Me.Accounts
   alias Boruta.Oauth.ResourceOwner
 
+  # TODO: upgrade to Boruta 3.0+
   @behaviour Boruta.Oauth.ResourceOwners
 
   @impl Boruta.Oauth.ResourceOwners
@@ -17,20 +18,37 @@ defmodule Bonfire.OpenID do
     get_user(sub)
   end
 
-  defp get_user(id_or_username) do
-    with %{} = user <- Users.get_current(id_or_username) do
-      {:ok,
-       %ResourceOwner{
-         sub: to_string(user.id),
-         username: user.character.username,
-         # TODO include email, etc?
-         last_login_at: nil
-       }}
+  def get_user(id_or_username) when is_binary(id_or_username) do
+    with %{id: _user_id} = user <- Users.get_current(id_or_username) do
+      get_user(user)
     else
       _ ->
         error(id_or_username, l("User not found."))
     end
   end
+
+  def get_user(%Plug.Conn{} = conn) do
+    case current_user(conn) do
+      id when is_binary(id) -> get_user(id)
+      %{} = user -> get_user(user)
+      _ -> error(conn, "User not found")
+    end
+  end
+
+  def get_user(%{id: id} = current_user) do
+    {:ok,
+     %ResourceOwner{
+       sub: id,
+       username: e(current_user, :character, :username, nil) || e(current_user, :email, nil),
+       # TODO include email, etc?
+       last_login_at:
+         if(Types.is_uid?(id),
+           do: Bonfire.Social.Seen.last_date(id, current_account_id(current_user))
+         ) || e(current_user, :last_login_at, nil)
+     }}
+  end
+
+  def get_user(other), do: error(other, "Could not find user")
 
   @impl Boruta.Oauth.ResourceOwners
   def check_password(resource_owner, password) do

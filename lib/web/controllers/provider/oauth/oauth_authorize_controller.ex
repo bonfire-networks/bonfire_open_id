@@ -12,12 +12,9 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, _params) do
-    agent = current_user(conn) || current_account(conn)
-    conn = store_go(conn)
-
     authorize_response(
       conn,
-      agent
+      current_user(conn) || current_account(conn)
     )
   end
 
@@ -44,8 +41,12 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   end
 
   defp authorize_response(conn, other) do
-    warn(other, "no agent in conn")
-    redirect_to_login(conn)
+    debug(other, "not yet signed in")
+    url = current_path(conn)
+
+    conn
+    |> store_go(url)
+    |> redirect_to_login(url)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -117,14 +118,15 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   @impl Boruta.Oauth.AuthorizeApplication
   def preauthorize_error(_conn, _response), do: :ok
 
-  defp store_go(conn) do
+  defp store_go(conn, url \\ nil) do
+    # remove prompt and max_age params affecting redirections
     put_session(
       conn,
       :go,
-      current_path(conn)
+      url || current_path(conn)
     )
   end
 
-  defdelegate redirect_to_login(conn),
+  defdelegate redirect_to_login(conn, go_after_url \\ nil),
     to: Bonfire.OpenID.Web.Openid.AuthorizeController
 end
