@@ -1,7 +1,7 @@
 defmodule Bonfire.OpenID.Web.ClientController do
   use Bonfire.UI.Common.Web, :controller
 
-  import Bonfire.OpenID
+  # import Bonfire.OpenID
   alias Bonfire.OpenID.Client
 
   # The `Authentication` module here is an imaginary interface for setting session state
@@ -82,7 +82,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
            client_secret: client_secret,
            redirect_uri: redirect_uri
          },
-         %{"code" => code} = params
+         %{"code" => code} = _params
        ) do
     query =
       URI.encode_query(%{

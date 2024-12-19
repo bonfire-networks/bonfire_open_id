@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Client do
-  alias Bonfire.Common.Utils
+  # alias Bonfire.Common.Utils
 
   def open_id_connect_providers,
     do:

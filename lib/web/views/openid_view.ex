@@ -38,6 +38,7 @@ defmodule Bonfire.OpenID.Web.OpenidView do
   end
 
   def render("error.html", %{error: error, error_description: error_description}) do
+    error(error, to_string(error_description))
     error_description
   end
 end

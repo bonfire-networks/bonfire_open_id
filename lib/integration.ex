@@ -56,7 +56,7 @@ defmodule Bonfire.OpenID do
            email_or_username: resource_owner.username,
            password: password
          }) do
-      {:ok, account, user} ->
+      {:ok, _account, _user} ->
         :ok
 
       _ ->

@@ -1,7 +1,7 @@
 defmodule Bonfire.OpenID.Provider.ClientApps do
   use Bonfire.Common.Repo
   import Bonfire.Common.Utils
-  alias Bonfire.Common.Enums
+  # alias Bonfire.Common.Enums
   alias Bonfire.Common.Types
 
   defdelegate list_clients, to: Boruta.Ecto.Admin
