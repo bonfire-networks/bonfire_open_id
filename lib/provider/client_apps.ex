@@ -22,6 +22,30 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     end
   end
 
+  def update_redirect_uris(%Boruta.Ecto.Client{} = client, redirect_uris)
+      when is_list(redirect_uris) do
+    update_client(client, %{redirect_uris: redirect_uris})
+  end
+
+  def update_redirect_uris(%Boruta.Ecto.Client{} = client, redirect_uri)
+      when is_binary(redirect_uri) do
+    update_redirect_uris(%Boruta.Ecto.Client{} = client, [redirect_uri])
+  end
+
+  # eg: update_scopes(client, ["openid", "email"])
+  def update_scopes(%Boruta.Ecto.Client{} = client, scopes) do
+    update_client(client, %{
+      authorize_scope: true,
+      authorized_scopes:
+        List.wrap(scopes)
+        |> Enum.map(&%{name: &1})
+    })
+  end
+
+  def update_client(%Boruta.Ecto.Client{} = client, %{} = attrs) do
+    Boruta.Ecto.Admin.update_client(client, attrs)
+  end
+
   def get(id \\ nil, name, redirect_uri)
 
   def get(nil, name, redirect_uri) when is_binary(redirect_uri) do

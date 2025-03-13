@@ -20,16 +20,17 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
     resource_owner =
       get_resource_owner(conn)
-      |> debug()
+      |> info("resource_owner")
 
     with {:unchanged, conn} <- prompt_redirection(conn),
          {:unchanged, conn} <- max_age_redirection(conn, resource_owner),
          {:unchanged, conn} <-
-           login_redirection(conn, go_after_url) |> debug("login_redirection?") do
+           login_redirection(conn, go_after_url) |> info("login_redirection?") do
       conn
       |> store_go(nil)
+      |> info("go_stored")
       |> oauth_module().authorize(resource_owner, __MODULE__)
-      |> debug("authorized?")
+      |> info("authorized?")
     end
   end
 
@@ -44,7 +45,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
           _ -> "code id_token token"
         end
       end)
-      |> debug()
+      |> info()
 
     authorize(%{conn | query_params: query_params}, query_params)
   end
@@ -90,6 +91,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
           error_description: error_description
         }
       ) do
+    error(error, inspect(error_description))
+
     conn
     |> put_status(status)
     |> put_view(OauthView)
