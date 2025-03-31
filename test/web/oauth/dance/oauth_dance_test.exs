@@ -85,7 +85,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
       # Extract CSRF token from response body
       doc =
         response.body
-        |> IO.inspect()
+        |> debug()
         |> Floki.parse_document!()
 
       csrf_token =
