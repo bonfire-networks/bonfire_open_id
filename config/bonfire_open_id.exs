@@ -14,7 +14,7 @@ config :boruta, Boruta.Oauth,
     resource_owners: Bonfire.OpenID
   ]
 
-if Mix.env() == :test and test_instance not in yes? do
+if config_env() == :test and test_instance not in yes? do
   config :bonfire_open_id, :oauth_module, Boruta.OauthMock
   config :bonfire_open_id, :openid_module, Boruta.OpenidMock
 end

@@ -34,6 +34,10 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     end
   end
 
+  # def authorize_with_params(%Plug.Conn{} = conn, params) do
+  #   authorize(%{conn | query_params: params}, params)
+  # end
+
   def from_query_string(conn, query) do
     query_params =
       Plug.Conn.Query.decode(query)

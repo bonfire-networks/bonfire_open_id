@@ -68,7 +68,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_error(conn, error)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) =~ ~r/error=login_required/
     end
@@ -102,7 +102,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_success(conn, response)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) in [
                "http://redirect.uri#access_token=access_token&expires_in=10",
@@ -129,10 +129,9 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_error(conn, error)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert html_response(conn, 400) =~ ~r/Error description/
-
       # assert html_response(conn, 400) =~ ~r/Request is not a valid/
     end
 
@@ -153,7 +152,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_error(conn, error)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) ==
                "http://redirect.uri#error=unknown_error&error_description=Error+description"
@@ -176,7 +175,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_error(conn, error)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) ==
                "http://redirect.uri?error=unknown_error&error_description=Error+description"
@@ -198,7 +197,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_success(conn, response)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) in [
                "http://redirect.uri#access_token=access_token&expires_in=10",
@@ -223,11 +222,12 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_success(conn, response)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) in [
                "http://redirect.uri#access_token=access_token&expires_in=10&state=state",
-               "http://redirect.uri#state=state&expires_in=10&access_token=access_token"
+               "http://redirect.uri#state=state&expires_in=10&access_token=access_token",
+               "http://redirect.uri#state=state&access_token=access_token&expires_in=10"
              ]
     end
 
@@ -246,7 +246,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_success(conn, response)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) ==
                "http://redirect.uri?code=code"
@@ -268,7 +268,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
         module.authorize_success(conn, response)
       end)
 
-      conn = AuthorizeController.authorize(conn, %{})
+      conn = AuthorizeController.authorize(conn, %{"response_type" => "code"})
 
       assert redirected_to(conn) ==
                "http://redirect.uri?code=code&state=state"
@@ -276,10 +276,12 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
   end
 
   defp assert_authorize_redirected_to_login(conn) do
-    assert redirected_to(AuthorizeController.authorize(conn, %{})) =~ "login"
+    assert redirected_to(AuthorizeController.authorize(conn, %{"response_type" => "code"})) =~
+             "login"
   end
 
   defp assert_authorize_user_logged_out(conn) do
-    assert redirected_to(AuthorizeController.authorize(conn, %{})) =~ "logout"
+    assert redirected_to(AuthorizeController.authorize(conn, %{"response_type" => "code"})) =~
+             "logout"
   end
 end
