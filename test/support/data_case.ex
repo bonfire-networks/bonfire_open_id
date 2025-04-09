@@ -23,6 +23,8 @@ defmodule Bonfire.OpenID.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       # import Bonfire.OpenID.DataCase
+
+      @moduletag :backend
     end
   end
 
