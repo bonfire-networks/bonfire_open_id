@@ -141,7 +141,8 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
 
       assert redirected_to(conn) in [
                "http://redirect.uri#access_token=access_token&expires_in=10&state=state",
-               "http://redirect.uri#state=state&expires_in=10&access_token=access_token"
+               "http://redirect.uri#state=state&expires_in=10&access_token=access_token",
+               "http://redirect.uri#state=state&access_token=access_token&expires_in=10"
              ]
     end
 
