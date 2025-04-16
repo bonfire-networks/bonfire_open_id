@@ -12,7 +12,8 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.OpenID.Provider.ClientApps
 
-  @tag :test_instance
+  #  see https://github.com/bonfire-networks/bonfire-app/issues/1201
+  @tag :todo
   test "can login using OpenID Connect", context do
     redirect_uri = "http://localhost:4002/openid/client/test_oidc_provider"
     main_instance = "http://localhost:4000"

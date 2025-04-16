@@ -13,7 +13,8 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
 
   alias Bonfire.OpenID.Provider.ClientApps
 
-  @tag :test_instance
+  #  see https://github.com/bonfire-networks/bonfire-app/issues/1201
+  @tag :todo
   test "can login using oAuth", context do
     redirect_uri = "http://localhost:4002/oauth/client/test_oauth_provider"
 
@@ -25,19 +26,6 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
              |> debug("client created")
 
     TestInstanceRepo.apply(fn ->
-      # now we're on a remote instance and should try signing in via the first instance using oauth
-
-      # configure something similar to this using the info above with `Config.put(key, data, otp_app)`
-      #   config :bonfire_open_id, :oauth2_providers,
-      #     github: [
-      #     display_name: "GitHub",
-      #     client_id: github_app_client_id,
-      #     client_secret: System.get_env("GITHUB_CLIENT_SECRET"),
-      #     authorize_uri: "https://github.com/login/oauth/authorize", # TODO
-      #     access_token_uri: "https://github.com/login/oauth/access_token",
-      #     redirect_uri: "#{Bonfire.Common.URIs.base_url}/openid/client/github",
-      #   ]
-
       client_name = client.name
       main_instance = "http://localhost:4000/"
 

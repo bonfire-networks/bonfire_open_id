@@ -9,15 +9,15 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   defdelegate list_active_tokens, to: Boruta.Ecto.Admin
 
   def get_or_new(id_or_name, redirect_uri) do
-    case get(Types.uid(id_or_name), id_or_name, redirect_uri) do
-      nil -> ok_unwrap(new(id_or_name, redirect_uri))
+    case get(Types.uid(id_or_name), id_or_name, redirect_uri) |> debug("got") do
+      nil -> ok_unwrap(new(id_or_name, redirect_uri) |> debug("newed"))
       client -> client
     end
   end
 
   def get_or_new(clauses) do
-    case get(clauses) do
-      nil -> ok_unwrap(new(Map.new(clauses)))
+    case get(clauses) |> debug("got") do
+      nil -> ok_unwrap(new(Map.new(clauses)) |> debug("newed"))
       client -> client
     end
   end
@@ -74,16 +74,19 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def new(id_or_name, redirect_uris)
       when is_binary(id_or_name) and is_list(redirect_uris) and
              length(redirect_uris) > 0 do
-    new(%{
-      id: Types.uid(id_or_name) || SecureRandom.uuid(),
-      name: id_or_name,
-      redirect_uris: redirect_uris
-    })
+    new(
+      %{
+        id: Types.uid(id_or_name) || SecureRandom.uuid(),
+        name: id_or_name,
+        redirect_uris: redirect_uris
+      }
+      |> debug("map")
+    )
   end
 
   def new(id_or_name, redirect_uri)
       when is_binary(id_or_name) and is_binary(redirect_uri) do
-    new(id_or_name, [redirect_uri])
+    new(id_or_name, [redirect_uri] |> debug("uri"))
   end
 
   def new(params) when is_map(params) do
@@ -146,6 +149,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
     |> Map.merge(params)
+    |> debug("map to create")
     # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
   end
