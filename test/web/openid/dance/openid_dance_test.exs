@@ -8,7 +8,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
   import Bonfire.Common.Config, only: [repo: 0]
   use Bonfire.Common.E
 
-  alias Bonfire.Common.Config
+  use Bonfire.Common.Config
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.OpenID.Provider.ClientApps
 

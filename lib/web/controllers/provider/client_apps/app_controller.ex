@@ -1,6 +1,6 @@
 defmodule Bonfire.API.MastoCompatible.AppController do
   use Bonfire.UI.Common.Web, :controller
-  alias Bonfire.Common.Config
+  use Bonfire.Common.Config
   alias Bonfire.OpenID.Web.OauthView
   alias Bonfire.OpenID.Provider.ClientApps
 
