@@ -12,19 +12,22 @@ defmodule Bonfire.OpenID.Web.ClientController do
       if provider_config = Client.open_id_connect_providers()[provider] do
         #  redirect to authorization URL
         if params == %{} do
+          # start flow: redirect to remote authorization URL
           redirect_to(conn, openid_provider_url(provider, provider_config), type: :maybe_external)
         else
+          # callback after coming back from remote 
           with_open_id_connect(conn, provider, Map.new(provider_config), params)
         end
       else
         if provider_config = Client.oauth2_providers()[provider] do
           debug(provider_config)
-          #  redirect to authorization URL
+          # start flow: redirect to remote authorization URL
           if params == %{} do
             redirect_to(conn, oauth_provider_url(provider, provider_config),
               type: :maybe_external
             )
           else
+            # callback after coming back from remote 
             with_oauth2(conn, Map.new(provider_config), params)
           end
         else
@@ -63,11 +66,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
     "#{config[:authorize_uri]}?#{params}"
   end
 
+  def openid_callback_url(provider) do
+    "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}"
+  end
+
   def openid_provider_url(provider, config \\ nil) do
     Utils.ok_unwrap(
       Map.new(config || Client.open_id_connect_providers()[provider])
-      #  |> Map.put(:redirect_uri, "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}")
-      |> OpenIDConnect.authorization_uri(%{
+      |> OpenIDConnect.authorization_uri(openid_callback_url(provider), %{
         "state" => Bonfire.Common.Text.random_string(),
         "nonce" => Bonfire.Common.Text.random_string()
       })
@@ -125,16 +131,23 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   defp with_open_id_connect(conn, provider, provider_config, params) do
-    debug(params)
+    info(params, "uri_params")
 
     # provider_config = provider_config
     # |> Map.put(:redirect_uri, "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}")
 
     error_msg = l("An unknown error occurred with OpenID Connect.")
     # Map.merge(params, %{"scope"=> "openid /read-public"})
-    with {:ok, tokens} <- OpenIDConnect.fetch_tokens(provider_config, params) |> debug("tokens"),
+    with {:ok, tokens} <-
+           OpenIDConnect.fetch_tokens(
+             provider_config,
+             Enums.input_to_atoms(params)
+             |> Map.put(:redirect_uri, openid_callback_url(provider))
+             |> info("prepared_params")
+           )
+           |> info("fetched_tokens"),
          {:ok, claims} <-
-           OpenIDConnect.verify(provider_config, tokens["id_token"]) |> debug("claims") do
+           OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims") do
       process_open_id_connect(conn, provider, Enum.into(claims, tokens))
     else
       {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
@@ -180,10 +193,10 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   defp process_open_id_connect(conn, provider, params) do
-    debug(conn)
+    # debug(conn)
 
     if current_user = current_user(conn) do
-      debug(params)
+      info(params, "params")
 
       with {:ok, _obj} <-
              maybe_apply(Bonfire.Social.Graph.Aliases, :add, [
