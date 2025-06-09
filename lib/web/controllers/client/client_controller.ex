@@ -225,11 +225,11 @@ defmodule Bonfire.OpenID.Web.ClientController do
                    {:provider, provider, params}
                  ]) do
             user = repo().maybe_preload(user, :account)
-            debug(user)
+            info(user, "found user")
             Bonfire.UI.Me.LoginController.logged_in(user.account, user, conn)
           else
             e ->
-              error(e, "could not auth with no email")
+              error(e, "cannot auth with no email")
 
               send_resp(
                 conn,
@@ -241,11 +241,11 @@ defmodule Bonfire.OpenID.Web.ClientController do
           end
 
         other ->
-          debug(other, "Could not login, attempt creating an account")
+          info(other, "Could not login, attempt creating an account")
 
           with {:ok, conn} <-
                  Bonfire.UI.Me.SignupController.attempt(conn, %{openid_email: email})
-                 |> debug("attempted creating an account") do
+                 |> info("attempted creating an account") do
             conn
           else
             other ->
@@ -255,5 +255,16 @@ defmodule Bonfire.OpenID.Web.ClientController do
           end
       end
     end
+  rescue
+    exception ->
+      error(exception, "Exception during SSO attempt")
+
+      send_resp(
+        conn,
+        401,
+        l(
+          "An unexpected error occurred while trying to find or create an account for you, please contact the instance admins."
+        )
+      )
   end
 end
