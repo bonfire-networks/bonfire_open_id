@@ -243,8 +243,11 @@ defmodule Bonfire.OpenID.Web.ClientController do
         other ->
           info(other, "Could not login, attempt creating an account")
 
+          # TODO: make this configurable per-provider
           with {:ok, conn} <-
-                 Bonfire.UI.Me.SignupController.attempt(conn, %{openid_email: email})
+                 Bonfire.UI.Me.SignupController.attempt(conn, %{openid_email: email}, %{},
+                   must_confirm?: false
+                 )
                  |> info("attempted creating an account") do
             conn
           else
