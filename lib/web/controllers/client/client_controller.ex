@@ -28,17 +28,17 @@ defmodule Bonfire.OpenID.Web.ClientController do
             )
           else
             # callback after coming back from remote 
-            with_oauth2(conn, Map.new(provider_config), params)
+            with_oauth2(conn, provider, Map.new(provider_config), params)
           end
         else
-          send_resp(conn, 401, "Provider not recognised.")
+          raise Bonfire.Fail, {:not_found, "Provider #{inspect(provider)}"}
         end
       end
     else
       other ->
         error(other)
 
-        send_resp(conn, 401, "Provider not recognised.")
+        raise Bonfire.Fail, {:not_found, "Provider #{inspect(provider)}"}
     end
   end
 
@@ -82,11 +82,13 @@ defmodule Bonfire.OpenID.Web.ClientController do
 
   defp with_oauth2(
          conn,
+         provider,
          %{
            client_id: client_id,
            access_token_uri: access_token_uri,
            client_secret: client_secret,
-           redirect_uri: redirect_uri
+           redirect_uri: redirect_uri,
+           userinfo_uri: userinfo_uri
          },
          %{"code" => code} = _params
        ) do
@@ -98,25 +100,28 @@ defmodule Bonfire.OpenID.Web.ClientController do
         redirect_uri: redirect_uri
       })
 
-    with {:ok, %{body: result}} <- Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
-         %{"access_token" => access_token} = result <- URI.decode_query(result) do
-      result
-      |> debug("WIP")
-
-      send_resp(conn, 200, "Your code: #{access_token}")
+    with {:ok, %{body: token_result}} <-
+           Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
+         %{"access_token" => access_token} = token_data <-
+           URI.decode_query(token_result) |> debug("token_data"),
+         {:ok, %{body: userinfo_body}} <-
+           Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}]),
+         {:ok, userinfo} <- Jason.decode(userinfo_body) do
+      process_external_auth(conn, provider, Enum.into(userinfo, token_data))
     else
       %{"error_description" => msg} = e ->
         error(e)
-        send_resp(conn, 401, msg)
+        raise Bonfire.Fail, {:unknown, msg}
 
       e ->
         error(e)
-        send_resp(conn, 401, l("There was an error."))
+        raise Bonfire.Fail, {:unknown, l("There was an error.")}
     end
   end
 
   defp with_oauth2(
          conn,
+         _provider,
          %{client_id: client_id, authorize_uri: authorize_uri, redirect_uri: redirect_uri},
          _params
        ) do
@@ -148,7 +153,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
            |> info("fetched_tokens"),
          {:ok, claims} <-
            OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims") do
-      process_open_id_connect(conn, provider, Enum.into(claims, tokens))
+      process_external_auth(conn, provider, Enum.into(claims, tokens))
     else
       {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
         process_body_error(conn, body, error_msg)
@@ -164,21 +169,16 @@ defmodule Bonfire.OpenID.Web.ClientController do
   defp process_body_error(conn, body, error_msg) when is_binary(body) do
     case Jason.decode(body) do
       {:ok, %{"error_description" => e} = body} ->
-        error(body, error_msg)
-        send_resp(conn, 401, e)
+        process_body_error(conn, body, e || error_msg)
 
       {:ok, %{"error" => e} = body} ->
-        error(body, error_msg)
-        send_resp(conn, 401, e)
+        process_body_error(conn, body, e || error_msg)
 
       {:ok, _} = body ->
-        error(body, error_msg)
-        send_resp(conn, 401, error_msg)
+        process_body_error(conn, body, error_msg)
 
       _ ->
-        error(body, error_msg)
-
-        send_resp(conn, 401, error_msg)
+        process_body_error(conn, body, error_msg)
     end
   end
 
@@ -189,10 +189,10 @@ defmodule Bonfire.OpenID.Web.ClientController do
   defp process_body_error(conn, body, error_msg) do
     error(body, error_msg)
 
-    send_resp(conn, 401, error_msg)
+    raise Bonfire.Fail, {:unknown, error_msg}
   end
 
-  defp process_open_id_connect(conn, provider, params) do
+  defp process_external_auth(conn, provider, params) do
     # debug(conn)
 
     if current_user = current_user(conn) do
@@ -202,14 +202,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
              maybe_apply(Bonfire.Social.Graph.Aliases, :add, [
                current_user,
                {:provider, provider, params},
-               update_existing: true
+               [update_existing: true]
              ]) do
         redirect_to(conn, "/user")
       else
         e ->
           msg = l("An error occurred saving the external authentication.")
           error(e, msg)
-          send_resp(conn, 401, msg)
+          raise Bonfire.Fail, {:unknown, msg}
       end
     else
       email = params["email"]
@@ -228,16 +228,22 @@ defmodule Bonfire.OpenID.Web.ClientController do
             info(user, "found user")
             Bonfire.UI.Me.LoginController.logged_in(user.account, user, conn)
           else
-            e ->
-              error(e, "cannot auth with no email")
-
-              send_resp(
-                conn,
-                401,
-                l(
-                  "The oauth provider did not indicate an email for your account, which is not currently supported unless you first sign in to your Bonfire account and then add it in your profile settings."
-                )
+            {:error, e} when is_binary(e) ->
+              error(
+                e,
+                "cannot register new account with no email, and error occurred while trying to find existing account"
               )
+
+              raise Bonfire.Fail, {:invalid_credentials, e}
+
+            e ->
+              error(e, "cannot register new account with no email, and no existing account found")
+
+              raise Bonfire.Fail,
+                    {:invalid_credentials,
+                     l(
+                       "The SSO provider did not indicate an email for your account, which is not currently supported unless you first sign in to your Bonfire account and then add it in your profile settings."
+                     )}
           end
 
         other ->
@@ -254,20 +260,23 @@ defmodule Bonfire.OpenID.Web.ClientController do
             other ->
               error(other)
 
-              send_resp(conn, 401, l("Could not find or create an account for you, sorry."))
+              raise Bonfire.Fail,
+                    {:invalid_credentials,
+                     l("Could not find or create an account for you, sorry.")}
           end
       end
     end
-  rescue
-    exception ->
-      error(exception, "Exception during SSO attempt")
 
-      send_resp(
-        conn,
-        401,
-        l(
-          "An unexpected error occurred while trying to find or create an account for you, please contact the instance admins."
-        )
-      )
+    # rescue
+    #   exception ->
+    #     error(exception, "Exception during SSO attempt")
+
+    #     send_resp(
+    #       conn,
+    #       401,
+    #       l(
+    #         "An unexpected error occurred while trying to find or create an account for you, please contact the instance admins."
+    #       )
+    #     )
   end
 end

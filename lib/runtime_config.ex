@@ -13,17 +13,18 @@ defmodule Bonfire.OpenID.RuntimeConfig do
     # config :bonfire_open_id,
     #   modularity: :disabled
 
+    # offer an OAuth & OpenID provider
     config :boruta, Boruta.Oauth,
       issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org"),
       redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate}
 
     # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082 
-    main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY")
 
-    if main_discovery_document_uri do
+    # connect as a client to an OpenID Connect provider https://yourinstance.tld/oauth/client/main
+    if main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY") do
       config :bonfire_open_id, :openid_connect_providers,
-        main: [
-          display_name: System.get_env("OPENID_1_DISPLAY_NAME", "Single sign-on"),
+        openid_1: [
+          display_name: System.get_env("OPENID_1_DISPLAY_NAME", l("Single sign-on")),
           discovery_document_uri: main_discovery_document_uri,
           client_id: System.get_env("OPENID_1_CLIENT_ID"),
           client_secret: System.get_env("OPENID_1_CLIENT_SECRET"),
@@ -32,9 +33,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         ]
     end
 
-    orcid_client_id = System.get_env("ORCID_CLIENT_ID")
-
-    if orcid_client_id do
+    # connect as a client to the orcid.org OpenID Connect provider with callback url https://yourinstance.tld/oauth/client/orcid
+    if orcid_client_id = System.get_env("ORCID_CLIENT_ID") do
       config :bonfire_open_id, :openid_connect_providers,
         orcid: [
           display_name: "ORCID",
@@ -47,17 +47,30 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         ]
     end
 
-    # TODO?
-    # github_app_client_id = System.get_env("GITHUB_APP_CLIENT_ID", "Iv1.8d612e6e5a2149c9")
-    # if github_app_client_id do
-    #   config :bonfire_open_id, :oauth2_providers,
-    #     github: [
-    #     display_name: "GitHub",
-    #     client_id: github_app_client_id,
-    #     client_secret: System.get_env("GITHUB_CLIENT_SECRET"),
-    #     authorize_uri: "https://github.com/login/oauth/authorize",
-    #     access_token_uri: "https://github.com/login/oauth/access_token"
-    #   ]
-    # end
+    # connect as a client to an OAuth2 provider with callback url https://yourinstance.tld/oauth/client/primary
+    if oauth_app_client_id = System.get_env("OAUTH_1_CLIENT_ID") do
+      config :bonfire_open_id, :oauth2_providers,
+        oauth_1: [
+          display_name: System.get_env("OAUTH_1_DISPLAY_NAME", l("Single sign-on")),
+          client_id: oauth_app_client_id,
+          client_secret: System.get_env("OAUTH_1_CLIENT_SECRET"),
+          authorize_uri: System.get_env("OAUTH_1_AUTHORIZE_URI"),
+          access_token_uri: System.get_env("OAUTH_1_ACCESS_TOKEN_URI"),
+          userinfo_uri: System.get_env("OAUTH_1_USERINFO_URI")
+        ]
+    end
+
+    # connect as a client to Github's OAuth2 provider with callback url https://yourinstance.tld/oauth/client/github
+    if github_app_client_id = System.get_env("GITHUB_APP_CLIENT_ID") do
+      config :bonfire_open_id, :oauth2_providers,
+        github: [
+          display_name: "GitHub",
+          client_id: github_app_client_id,
+          client_secret: System.get_env("GITHUB_CLIENT_SECRET"),
+          authorize_uri: "https://github.com/login/oauth/authorize",
+          access_token_uri: "https://github.com/login/oauth/access_token",
+          userinfo_uri: "https://api.github.com/user"
+        ]
+    end
   end
 end
