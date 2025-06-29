@@ -29,7 +29,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           client_id: System.get_env("OPENID_1_CLIENT_ID"),
           client_secret: System.get_env("OPENID_1_CLIENT_SECRET"),
           response_type: System.get_env("OPENID_1_RESPONSE_TYPE", "code"),
-          scope: System.get_env("OPENID_1_SCOPE", "identity data:public")
+          scope: System.get_env("OPENID_1_SCOPE", "identity data:public"),
+          enable_signup: System.get_env("OPENID_1_ENABLE_SIGNUP") == "true"
         ]
     end
 
@@ -43,7 +44,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           client_id: orcid_client_id,
           client_secret: System.get_env("ORCID_CLIENT_SECRET"),
           response_type: "code",
-          scope: "openid"
+          scope: "openid",
+          enable_signup: false
         ]
     end
 
@@ -56,7 +58,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           client_secret: System.get_env("OAUTH_1_CLIENT_SECRET"),
           authorize_uri: System.get_env("OAUTH_1_AUTHORIZE_URI"),
           access_token_uri: System.get_env("OAUTH_1_ACCESS_TOKEN_URI"),
-          userinfo_uri: System.get_env("OAUTH_1_USERINFO_URI")
+          userinfo_uri: System.get_env("OAUTH_1_USERINFO_URI"),
+          enable_signup: System.get_env("OAUTH_1_ENABLE_SIGNUP") == "true"
         ]
     end
 
@@ -69,7 +72,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           client_secret: System.get_env("GITHUB_CLIENT_SECRET"),
           authorize_uri: "https://github.com/login/oauth/authorize",
           access_token_uri: "https://github.com/login/oauth/access_token",
-          userinfo_uri: "https://api.github.com/user"
+          userinfo_uri: "https://api.github.com/user",
+          enable_signup: false
         ]
     end
   end

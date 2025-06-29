@@ -5,6 +5,16 @@ defmodule Bonfire.OpenID.Web.Routes do
     quote do
       import Bonfire.OpenID.Plugs.ClientID
 
+      def check_provider_enabled(conn, _opts) do
+        if System.get_env("ENABLE_SSO_PROVIDER") == "true" do
+          conn
+        else
+          conn
+          |> send_resp(404, "SSO provider endpoints are disabled")
+          |> halt()
+        end
+      end
+
       # client routes
 
       scope "/openid/client", Bonfire.OpenID.Web do
@@ -28,7 +38,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       # server/provider routes
 
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
-        pipe_through([:basic, :validate_client_id])
+        pipe_through([:check_provider_enabled, :basic, :validate_client_id])
 
         post("/revoke", RevokeController, :revoke)
         post("/token", TokenController, :token)
@@ -36,7 +46,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
-        pipe_through([:basic, :load_current_auth, :validate_client_id])
+        pipe_through([:check_provider_enabled, :basic, :load_current_auth, :validate_client_id])
 
         get("/authorize", AuthorizeController, :authorize)
         post("/authorize", AuthorizeController, :authorize)
@@ -44,7 +54,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/openid", Bonfire.OpenID.Web.Openid do
-        pipe_through([:basic, :load_current_auth])
+        pipe_through([:check_provider_enabled, :basic, :load_current_auth])
 
         get("/authorize", AuthorizeController, :authorize)
         get("/userinfo", UserinfoController, :userinfo)
@@ -53,7 +63,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/.well-known", Bonfire.OpenID.Web.Openid do
-        pipe_through([:basic])
+        pipe_through([:check_provider_enabled, :basic])
 
         get("/openid-configuration", UserinfoController, :discovery)
       end
