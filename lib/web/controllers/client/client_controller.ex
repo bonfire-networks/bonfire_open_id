@@ -281,7 +281,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   defp handle_unknown_account_with_no_email(conn, provider, params) do
-    error(params, "cannot register new account with no email, and no existing account found")
+    debug(params, "no existing account found, and no email provided")
 
     # WIP: support sign up with openid/oauth providers who don't provide the user's email address, we need to have a form to request for an email address (and maybe optionally a PW too) so we can create an account for them and then link it to the provider token (we can skip email confirmation)
 
