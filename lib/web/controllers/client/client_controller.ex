@@ -198,12 +198,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
     if current_user = current_user(conn) do
       info(params, "params")
 
-      with {:ok, _obj} <-
-             maybe_apply(Bonfire.Social.Graph.Aliases, :add, [
-               current_user,
-               {:provider, provider, params},
-               [update_existing: true]
-             ]) do
+      with {:ok, _obj} <- Client.link_provider_alias(current_user, provider, params) do
         redirect_to(conn, "/user")
       else
         e ->
@@ -228,6 +223,12 @@ defmodule Bonfire.OpenID.Web.ClientController do
             info(user, "found user")
             Bonfire.UI.Me.LoginController.logged_in(user.account, user, conn)
           else
+            [] ->
+              handle_unknown_account_with_no_email(conn, provider, params)
+
+            {:error, :not_found} ->
+              handle_unknown_account_with_no_email(conn, provider, params)
+
             {:error, e} when is_binary(e) ->
               error(
                 e,
@@ -237,13 +238,12 @@ defmodule Bonfire.OpenID.Web.ClientController do
               raise Bonfire.Fail, {:invalid_credentials, e}
 
             e ->
-              error(e, "cannot register new account with no email, and no existing account found")
+              error(
+                e,
+                "cannot register new account with no email, and error occurred while trying to find existing account"
+              )
 
-              raise Bonfire.Fail,
-                    {:invalid_credentials,
-                     l(
-                       "The SSO provider did not indicate an email for your account, which is not currently supported unless you first sign in to your Bonfire account and then add it in your profile settings."
-                     )}
+              raise Bonfire.Fail, :invalid_credentials
           end
 
         other ->
@@ -278,5 +278,37 @@ defmodule Bonfire.OpenID.Web.ClientController do
     #         "An unexpected error occurred while trying to find or create an account for you, please contact the instance admins."
     #       )
     #     )
+  end
+
+  defp handle_unknown_account_with_no_email(conn, provider, params) do
+    error(params, "cannot register new account with no email, and no existing account found")
+
+    # WIP: support sign up with openid/oauth providers who don't provide the user's email address, we need to have a form to request for an email address (and maybe optionally a PW too) so we can create an account for them and then link it to the provider token (we can skip email confirmation)
+
+    cache_key = token_put_cache(provider, params)
+
+    conn
+    |> assign(
+      :open_id_provider,
+      {provider, cache_key}
+    )
+    |> Plug.Conn.put_session(:open_id_provider, {provider, cache_key})
+    |> Bonfire.UI.Me.SignupController.render_view()
+
+    # raise Bonfire.Fail,
+    #       {:invalid_credentials,
+    #        l(
+    #          "The SSO provider did not indicate an email for your account, which is not currently supported unless you first sign in to your Bonfire account and then add it in your profile settings."
+    #        )}
+  end
+
+  # 30 minutes
+  @token_ttl 30 * 60 * 1000
+
+  def token_put_cache(provider, data) do
+    key = "openid_provider:#{provider}:#{Bonfire.Common.Text.random_string()}"
+    Bonfire.Common.Cache.put(key, data, expire: @token_ttl)
+
+    key
   end
 end

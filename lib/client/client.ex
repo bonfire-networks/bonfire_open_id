@@ -1,5 +1,6 @@
 defmodule Bonfire.OpenID.Client do
-  # alias Bonfire.Common.Utils
+  import Untangle
+  alias Bonfire.Common.Utils
 
   def open_id_connect_providers,
     do:
@@ -37,5 +38,26 @@ defmodule Bonfire.OpenID.Client do
 
   defp provider_url(provider, type) do
     "#{Bonfire.Common.URIs.base_url()}/#{type}/client/#{provider}"
+  end
+
+  def link_provider_token(current_user, provider, provider_token) do
+    case Bonfire.Common.Cache.get(provider_token) do
+      {:ok, %{} = provider_params} ->
+        link_provider_alias(current_user, provider, provider_params)
+
+        Bonfire.Common.Cache.remove(provider_token)
+
+      other ->
+        err(other, "No data for token #{inspect(provider_token)}")
+        :ok
+    end
+  end
+
+  def link_provider_alias(current_user, provider, params) do
+    Utils.maybe_apply(Bonfire.Social.Graph.Aliases, :add, [
+      current_user,
+      {:provider, provider, params},
+      [update_existing: true]
+    ])
   end
 end
