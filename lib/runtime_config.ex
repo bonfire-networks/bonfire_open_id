@@ -39,7 +39,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
       config :bonfire_open_id, :openid_connect_providers,
         orcid: [
           display_name: "ORCID",
-          only_supports_login: true,
+          # only_supports_login: true,
           discovery_document_uri: "https://orcid.org/.well-known/openid-configuration",
           client_id: orcid_client_id,
           client_secret: System.get_env("ORCID_CLIENT_SECRET"),
