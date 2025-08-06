@@ -87,29 +87,51 @@ defmodule Bonfire.OpenID.Web.ClientController do
            client_id: client_id,
            access_token_uri: access_token_uri,
            client_secret: client_secret,
-           redirect_uri: redirect_uri,
-           userinfo_uri: userinfo_uri
-         },
+           redirect_uri: redirect_uri
+         } = config,
          %{"code" => code} = _params
        ) do
     query =
       URI.encode_query(%{
+        grant_type: config[:grant_type] || "authorization_code",
         code: code,
         client_id: client_id,
         client_secret: client_secret,
-        redirect_uri: redirect_uri
+        redirect_uri: redirect_uri,
+        scope: config[:scope]
       })
 
     with {:ok, %{body: token_result}} <-
-           Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
+           Bonfire.Common.HTTP.post(
+             access_token_uri,
+             query,
+             [
+               {"content-type", "application/x-www-form-urlencoded"},
+               {"accept", "application/json"}
+             ]
+           )
+           |> debug("token_result"),
+         #  Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
          %{"access_token" => access_token} = token_data <-
-           URI.decode_query(token_result) |> debug("token_data"),
+           (case Jason.decode(token_result) do
+              {:ok, data} -> data
+              _ -> URI.decode_query(token_result)
+            end)
+           |> debug("token_data"),
          {:ok, %{body: userinfo_body}} <-
-           Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}]),
+           (if userinfo_uri = config[:userinfo_uri] do
+              Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}])
+            else
+              {:ok, %{body: "{}"}}
+            end),
          {:ok, userinfo} <- Jason.decode(userinfo_body) do
-      process_external_auth(conn, provider, Enum.into(userinfo, token_data))
+      process_external_auth(conn, provider, config, Enum.into(userinfo, token_data))
     else
       %{"error_description" => msg} = e ->
+        error(e)
+        raise Bonfire.Fail, {:unknown, msg}
+
+      %{"error" => msg} = e when is_binary(msg) ->
         error(e)
         raise Bonfire.Fail, {:unknown, msg}
 
@@ -153,7 +175,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
            |> info("fetched_tokens"),
          {:ok, claims} <-
            OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims") do
-      process_external_auth(conn, provider, Enum.into(claims, tokens))
+      process_external_auth(conn, provider, provider_config, Enum.into(claims, tokens))
     else
       {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
         process_body_error(conn, body, error_msg)
@@ -192,13 +214,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
     raise Bonfire.Fail, {:unknown, error_msg}
   end
 
-  defp process_external_auth(conn, provider, params) do
+  defp process_external_auth(conn, provider, provider_config, params) do
     # debug(conn)
 
     if current_user = current_user(conn) do
       info(params, "params")
 
-      with {:ok, _obj} <- Client.link_provider_alias(current_user, provider, params) do
+      with {:ok, _obj} <-
+             Client.link_provider_alias(current_user, provider, provider_config, params) do
         redirect_to(conn, "/user")
       else
         e ->
@@ -216,8 +239,9 @@ defmodule Bonfire.OpenID.Web.ClientController do
       else
         false ->
           with [%{account: _} = user] <-
-                 maybe_apply(Bonfire.Social.Graph.Aliases, :all_subjects_by_object, [
-                   {:provider, provider, params}
+                 Client.user_external_url(params, provider_config)
+                 ~> maybe_apply(Bonfire.Social.Graph.Aliases, :all_subjects_by_object, [
+                   {:provider, provider, ..., params}
                  ]) do
             user = repo().maybe_preload(user, :account)
             info(user, "found user")

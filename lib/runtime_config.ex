@@ -20,7 +20,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
 
     # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082 
 
-    # connect as a client to an OpenID Connect provider https://yourinstance.tld/oauth/client/main
+    # connect as a client to an OpenID Connect provider https://yourinstance.tld/oauth/client/openid_1
     if main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY") do
       config :bonfire_open_id, :openid_connect_providers,
         openid_1: [
@@ -30,7 +30,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           client_secret: System.get_env("OPENID_1_CLIENT_SECRET"),
           response_type: System.get_env("OPENID_1_RESPONSE_TYPE", "code"),
           scope: System.get_env("OPENID_1_SCOPE", "identity data:public"),
-          enable_signup: System.get_env("OPENID_1_ENABLE_SIGNUP") == "true"
+          enable_signup: System.get_env("OPENID_1_ENABLE_SIGNUP") != "false"
         ]
     end
 
@@ -45,11 +45,11 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           client_secret: System.get_env("ORCID_CLIENT_SECRET"),
           response_type: "code",
           scope: "openid",
-          enable_signup: false
+          enable_signup: true
         ]
     end
 
-    # connect as a client to an OAuth2 provider with callback url https://yourinstance.tld/oauth/client/primary
+    # connect as a client to an OAuth2 provider with callback url https://yourinstance.tld/oauth/client/oauth_1
     if oauth_app_client_id = System.get_env("OAUTH_1_CLIENT_ID") do
       config :bonfire_open_id, :oauth2_providers,
         oauth_1: [
@@ -59,7 +59,10 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           authorize_uri: System.get_env("OAUTH_1_AUTHORIZE_URI"),
           access_token_uri: System.get_env("OAUTH_1_ACCESS_TOKEN_URI"),
           userinfo_uri: System.get_env("OAUTH_1_USERINFO_URI"),
-          enable_signup: System.get_env("OAUTH_1_ENABLE_SIGNUP") == "true"
+          grant_type: System.get_env("OAUTH_1_GRANT_TYPE"),
+          scope: System.get_env("OAUTH_1_SCOPE"),
+          profile_url_pattern: System.get_env("OAUTH_1_PROFILE_URL_PATTERN"),
+          enable_signup: System.get_env("OAUTH_1_ENABLE_SIGNUP") != "false"
         ]
     end
 
@@ -73,7 +76,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           authorize_uri: "https://github.com/login/oauth/authorize",
           access_token_uri: "https://github.com/login/oauth/access_token",
           userinfo_uri: "https://api.github.com/user",
-          enable_signup: false
+          enable_signup: true
         ]
     end
   end
