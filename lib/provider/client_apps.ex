@@ -10,40 +10,49 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   def get_or_new(id_or_name, redirect_uri) do
     case get(Types.uid(id_or_name), id_or_name, redirect_uri) |> debug("got") do
-      nil -> ok_unwrap(new(id_or_name, redirect_uri) |> debug("newed"))
-      client -> client
+      nil -> new(id_or_name, redirect_uri) |> debug("newed")
+      client -> {:ok, client}
     end
   end
 
   def get_or_new(clauses) do
     case get(clauses) |> debug("got") do
-      nil -> ok_unwrap(new(Map.new(clauses)) |> debug("newed"))
-      client -> client
+      nil -> new(Map.new(clauses)) |> debug("newed")
+      client -> {:ok, client}
     end
   end
 
-  def update_redirect_uris(%Boruta.Ecto.Client{} = client, redirect_uris)
+  def update_redirect_uris(client, redirect_uris)
       when is_list(redirect_uris) do
     update_client(client, %{redirect_uris: redirect_uris})
   end
 
-  def update_redirect_uris(%Boruta.Ecto.Client{} = client, redirect_uri)
+  def update_redirect_uris(client, redirect_uri)
       when is_binary(redirect_uri) do
-    update_redirect_uris(%Boruta.Ecto.Client{} = client, [redirect_uri])
+    update_redirect_uris(client, [redirect_uri])
   end
 
   # eg: update_scopes(client, ["openid", "email"])
-  def update_scopes(%Boruta.Ecto.Client{} = client, scopes) do
+  def update_scopes(client, scopes \\ default_scopes()) do
     update_client(client, %{
       authorize_scope: true,
       authorized_scopes:
         List.wrap(scopes)
-        |> Enum.map(&%{name: &1})
+        |> Enum.map(fn
+          %{name: scope} -> %{name: scope}
+          scope -> %{name: scope}
+        end)
     })
   end
 
   def update_client(%Boruta.Ecto.Client{} = client, %{} = attrs) do
     Boruta.Ecto.Admin.update_client(client, attrs)
+  end
+
+  def update_client(client_id, %{} = attrs) when is_binary(client_id) do
+    if client = get_by_id(client_id) do
+      Boruta.Ecto.Admin.update_client(client, attrs)
+    end
   end
 
   def get(id \\ nil, name, redirect_uri)
@@ -59,15 +68,20 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   end
 
   def get(id, _name, _redirect_uri) do
-    repo().one(from c in Boruta.Ecto.Client, where: ^id == c.id)
+    get_by_id(id)
   end
 
   def get(id: id) do
-    Boruta.ClientsAdapter.get_client(id)
+    # Boruta.ClientsAdapter.get_client(id)
+    get_by_id(id)
   end
 
   def get(clauses) do
     repo().get_by(Boruta.Ecto.Client, clauses)
+  end
+
+  def get_by_id(id) do
+    repo().one(from c in Boruta.Ecto.Client, where: ^id == c.id)
   end
 
   @doc "Define an OAuth client app, providing a name and redirect URI(s)"
@@ -114,14 +128,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # take following authorized_scopes into account (skip public scopes)
       authorize_scope: true,
       # scopes that are authorized using this client
-      authorized_scopes: [
-        %{name: "identity"},
-        %{name: "data:public"},
-        %{name: "read"},
-        %{name: "write"},
-        %{name: "follow"},
-        %{name: "push"}
-      ],
+      # ...existing code...
+      authorized_scopes: default_scopes(),
       # client supported grant types
       supported_grant_types: [
         "client_credentials",
@@ -173,4 +181,56 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   #   "com.tapbots.Ivory.19300://request_token"<>rest
   # end
   def prepare_redirect_uri(uri), do: uri
+
+  def default_scopes,
+    do: [
+      %{name: "openid"},
+      %{name: "identity"},
+      %{name: "data:public"},
+      %{name: "follow"},
+      %{name: "profile"},
+      %{name: "push"},
+      %{name: "admin:read"},
+      %{name: "admin:read:accounts"},
+      %{name: "admin:read:canonical_email_blocks"},
+      %{name: "admin:read:domain_allows"},
+      %{name: "admin:read:domain_blocks"},
+      %{name: "admin:read:email_domain_blocks"},
+      %{name: "admin:read:ip_blocks"},
+      %{name: "admin:read:reports"},
+      %{name: "admin:write"},
+      %{name: "admin:write:accounts"},
+      %{name: "admin:write:canonical_email_blocks"},
+      %{name: "admin:write:domain_allows"},
+      %{name: "admin:write:domain_blocks"},
+      %{name: "admin:write:email_domain_blocks"},
+      %{name: "admin:write:ip_blocks"},
+      %{name: "admin:write:reports"},
+      %{name: "read"},
+      %{name: "read:accounts"},
+      %{name: "read:blocks"},
+      %{name: "read:bookmarks"},
+      %{name: "read:favourites"},
+      %{name: "read:filters"},
+      %{name: "read:follows"},
+      %{name: "read:lists"},
+      %{name: "read:mutes"},
+      %{name: "read:notifications"},
+      %{name: "read:search"},
+      %{name: "read:statuses"},
+      %{name: "write"},
+      %{name: "write:accounts"},
+      %{name: "write:blocks"},
+      %{name: "write:bookmarks"},
+      %{name: "write:conversations"},
+      %{name: "write:favourites"},
+      %{name: "write:filters"},
+      %{name: "write:follows"},
+      %{name: "write:lists"},
+      %{name: "write:media"},
+      %{name: "write:mutes"},
+      %{name: "write:notifications"},
+      %{name: "write:reports"},
+      %{name: "write:statuses"}
+    ]
 end

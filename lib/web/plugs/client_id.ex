@@ -32,7 +32,7 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
 
   defp maybe_register_client(conn, client_id, redirect_uri)
        when is_binary(client_id) and is_binary(redirect_uri) do
-    with %{id: id} = _client <-
+    with {:ok, %{id: id} = _client} <-
            ClientApps.get_or_new(
              String.trim(client_id),
              ClientApps.prepare_redirect_uri(redirect_uri)
