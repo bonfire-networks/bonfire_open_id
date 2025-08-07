@@ -36,15 +36,29 @@ defmodule Bonfire.OpenID.RuntimeConfig do
 
     # connect as a client to the orcid.org OpenID Connect provider with callback url https://yourinstance.tld/oauth/client/orcid
     if orcid_client_id = System.get_env("ORCID_CLIENT_ID") do
+      base_uri =
+        if System.get_env("ORCID_ENV") == "sandbox" do
+          "https://sandbox.orcid.org"
+        else
+          "https://orcid.org"
+        end
+
+      scope =
+        if System.get_env("ORCID_WITH_MEMBER_API") == "yes" do
+          "openid /read-limited /activities/update /person/update"
+        else
+          "openid"
+        end
+
       config :bonfire_open_id, :openid_connect_providers,
         orcid: [
           display_name: "ORCID",
           # only_supports_login: true,
-          discovery_document_uri: "https://orcid.org/.well-known/openid-configuration",
+          discovery_document_uri: "#{base_uri}/.well-known/openid-configuration",
           client_id: orcid_client_id,
           client_secret: System.get_env("ORCID_CLIENT_SECRET"),
           response_type: "code",
-          scope: "openid",
+          scope: scope,
           enable_signup: true
         ]
     end
@@ -83,7 +97,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
     # connect as a client to Zenodo's OAuth2 provider with callback url https://yourinstance.tld/oauth/client/zenodo
     if zenodo_client_id = System.get_env("ZENODO_CLIENT_ID") do
       base_uri =
-        if zenodo_env = System.get_env("ZENODO_ENV") == "sandbox" do
+        if System.get_env("ZENODO_ENV") == "sandbox" do
           "https://sandbox.zenodo.org"
         else
           "https://zenodo.org"
