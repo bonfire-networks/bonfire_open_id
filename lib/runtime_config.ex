@@ -82,14 +82,21 @@ defmodule Bonfire.OpenID.RuntimeConfig do
 
     # connect as a client to Zenodo's OAuth2 provider with callback url https://yourinstance.tld/oauth/client/zenodo
     if zenodo_client_id = System.get_env("ZENODO_CLIENT_ID") do
+      base_uri =
+        if zenodo_env = System.get_env("ZENODO_ENV") == "sandbox" do
+          "https://sandbox.zenodo.org"
+        else
+          "https://zenodo.org"
+        end
+
       config :bonfire_open_id, :oauth2_providers,
         zenodo: [
           display_name: System.get_env("ZENODO_DISPLAY_NAME", "Zenodo"),
           client_id: zenodo_client_id,
           client_secret: System.get_env("ZENODO_CLIENT_SECRET"),
-          authorize_uri: "https://zenodo.org/oauth/authorize",
-          access_token_uri: "https://zenodo.org/oauth/token",
-          userinfo_uri: "https://zenodo.org/api/me",
+          authorize_uri: "#{base_uri}/oauth/authorize",
+          access_token_uri: "#{base_uri}/oauth/token",
+          userinfo_uri: "#{base_uri}/api/me",
           grant_type: System.get_env("ZENODO_GRANT_TYPE", "authorization_code"),
           scope: System.get_env("ZENODO_SCOPE", "deposit:write deposit:actions"),
           enable_signup: true
