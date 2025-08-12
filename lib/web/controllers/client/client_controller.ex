@@ -91,7 +91,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
          } = config,
          %{"code" => code} = _params
        ) do
-    flood(code, "Received OAuth code at #{DateTime.utc_now()}")
+    debug(code, "Received OAuth code at #{DateTime.utc_now()}")
 
     query =
       URI.encode_query(%{
