@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.Controllers.Oauth.IntrospectControllerTest do
-  use ExUnit.Case, async: true
+  use Bonfire.OpenID.ConnCase, async: true
   import Phoenix.ConnTest
 
   import Mox

@@ -36,13 +36,16 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def update_scopes(client, scopes \\ default_scopes()) do
     update_client(client, %{
       authorize_scope: true,
-      authorized_scopes:
-        List.wrap(scopes)
-        |> Enum.map(fn
-          %{name: scope} -> %{name: scope}
-          scope -> %{name: scope}
-        end)
+      authorized_scopes: scopes_maps(scopes)
     })
+  end
+
+  def scopes_maps(scopes \\ default_scopes()) do
+    List.wrap(scopes)
+    |> Enum.map(fn
+      %{name: scope} -> %{name: scope}
+      scope -> %{name: scope}
+    end)
   end
 
   def update_client(%Boruta.Ecto.Client{} = client, %{} = attrs) do
@@ -106,7 +109,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def new(params) when is_map(params) do
     %{
       # OAuth client_id
-      id: Types.uid(params[:id]) || SecureRandom.uuid(),
+      id: Types.uid(params[:id]) || generate_client_id(),
       # OAuth client_secret
       secret: SecureRandom.hex(64),
       # Display name
@@ -129,7 +132,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       authorize_scope: true,
       # scopes that are authorized using this client
       # ...existing code...
-      authorized_scopes: default_scopes(),
+      authorized_scopes: scopes_maps(),
       # client supported grant types
       supported_grant_types: [
         "client_credentials",
@@ -182,55 +185,283 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   # end
   def prepare_redirect_uri(uri), do: uri
 
+  def register_dynamic_client(params) do
+    # Validate required fields
+    with {:ok, validated_params} <- validate_registration_params(params) do
+      registration_access_token = generate_registration_access_token()
+      client_id = generate_client_id()
+
+      # Store registration token in metadata since Boruta doesn't have a dedicated field
+      client_params = %{
+        id: client_id,
+        redirect_uris: validated_params["redirect_uris"],
+        supported_scopes: parse_scopes(validated_params["scope"]) || default_scopes(),
+        supported_grant_types: validated_params["grant_types"] || ["authorization_code"],
+        name: validated_params["client_name"] || "Dynamically Registered Client",
+        # Store registration token in metadata
+        metadata: %{"registration_access_token" => registration_access_token}
+      }
+
+      case new(client_params) do
+        {:ok, client} ->
+          client_response = %{
+            "client_id" => client.id,
+            "client_secret" => client.secret,
+            "registration_access_token" => registration_access_token,
+            "registration_client_uri" =>
+              "#{Bonfire.Common.URIs.base_url()}/openid/register/#{client.id}",
+            "client_name" => client.name,
+            "redirect_uris" => client.redirect_uris,
+            "grant_types" => client.supported_grant_types,
+            "response_types" => validated_params["response_types"] || ["code"],
+            "scope" =>
+              Enum.join(client.authorized_scopes |> Enum.map(& &1.name) || default_scopes(), " ")
+          }
+
+          {:ok, client_response}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  # Update this function to check metadata
+  def get_client_by_registration_token(client_id, registration_token) do
+    case get_by_id(client_id) do
+      nil ->
+        {:error, :not_found}
+
+      # Check metadata for the registration token
+      %{metadata: %{"registration_access_token" => ^registration_token}} = client ->
+        {:ok, client}
+
+      client ->
+        # Debug what we actually have
+        debug(client.metadata, "client metadata")
+        debug(registration_token, "looking for token")
+        {:error, :invalid_token}
+    end
+  end
+
+  # Also update the client configuration update to preserve the registration token
+  def update_client_configuration(client_id, registration_token, params) do
+    with {:ok, client} <- get_client_by_registration_token(client_id, registration_token),
+         converted_params = convert_oidc_to_internal_params(params) do
+      # Preserve the registration token in metadata when updating
+      updated_metadata =
+        Map.merge(client.metadata || %{}, %{"registration_access_token" => registration_token})
+
+      converted_params = Map.put(converted_params, :metadata, updated_metadata)
+
+      case update_client(client, converted_params) do
+        {:ok, updated_client} ->
+          client_config = %{
+            "client_id" => updated_client.id,
+            "client_secret" => updated_client.secret,
+            "client_name" => updated_client.name,
+            "redirect_uris" => updated_client.redirect_uris,
+            "grant_types" => updated_client.supported_grant_types || ["authorization_code"],
+            "response_types" =>
+              convert_grant_types_to_response_types(updated_client.supported_grant_types),
+            "scope" =>
+              Enum.join(updated_client.authorized_scopes |> Enum.map(& &1.name) || [], " "),
+            "token_endpoint_auth_method" =>
+              if(updated_client.confidential, do: "client_secret_post", else: "none")
+          }
+
+          {:ok, client_config}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  def get_client_configuration(client_id, registration_token) do
+    case get_client_by_registration_token(client_id, registration_token)
+         |> repo().maybe_preload(:authorized_scopes) do
+      {:ok, client} ->
+        client_config = %{
+          "client_id" => client.id,
+          "client_secret" => client.secret,
+          "client_name" => client.name,
+          "redirect_uris" => client.redirect_uris,
+          "grant_types" => client.supported_grant_types || ["authorization_code"],
+          "response_types" => convert_grant_types_to_response_types(client.supported_grant_types),
+          "scope" => Enum.join(client.authorized_scopes |> Enum.map(& &1.name) || [], " "),
+          "token_endpoint_auth_method" =>
+            if(client.confidential, do: "client_secret_post", else: "none")
+        }
+
+        {:ok, client_config}
+
+      error ->
+        error
+    end
+  end
+
+  def update_client_configuration(client_id, registration_token, params) do
+    with {:ok, client} <- get_client_by_registration_token(client_id, registration_token),
+         converted_params = convert_oidc_to_internal_params(params),
+         {:ok, updated_client} <- update_client(client, converted_params) do
+      # Return updated client config in OpenID Connect format
+      client_config = %{
+        "client_id" => updated_client.id,
+        "client_secret" => updated_client.secret,
+        "client_name" => updated_client.name,
+        "redirect_uris" => updated_client.redirect_uris,
+        "grant_types" => updated_client.supported_grant_types || ["authorization_code"],
+        "response_types" =>
+          convert_grant_types_to_response_types(updated_client.supported_grant_types),
+        "scope" => Enum.join(updated_client.authorized_scopes |> Enum.map(& &1.name) || [], " "),
+        "token_endpoint_auth_method" =>
+          if(updated_client.confidential, do: "client_secret_post", else: "none")
+      }
+
+      {:ok, client_config}
+    end
+  end
+
+  def delete_client(client_id, registration_token) do
+    case get_client_by_registration_token(client_id, registration_token) do
+      {:ok, client} ->
+        case repo().delete(client) do
+          {:ok, _} -> :ok
+          {:error, changeset} -> {:error, changeset}
+        end
+
+      error ->
+        error
+    end
+  end
+
+  # Helper functions
+  defp convert_grant_types_to_response_types(grant_types) when is_list(grant_types) do
+    grant_types
+    |> Enum.flat_map(fn
+      "authorization_code" -> ["code"]
+      "implicit" -> ["token", "id_token", "id_token token"]
+      _ -> []
+    end)
+    |> Enum.uniq()
+  end
+
+  defp convert_grant_types_to_response_types(_), do: ["code"]
+
+  defp convert_oidc_to_internal_params(params) do
+    converted = %{}
+
+    converted =
+      if params["client_name"],
+        do: Map.put(converted, :name, params["client_name"]),
+        else: converted
+
+    converted =
+      if params["redirect_uris"],
+        do: Map.put(converted, :redirect_uris, params["redirect_uris"]),
+        else: converted
+
+    converted =
+      if params["scope"],
+        do: Map.put(converted, :authorized_scopes, scopes_maps(parse_scopes(params["scope"]))),
+        else: converted
+
+    converted
+  end
+
+  defp validate_registration_params(params) do
+    # Validate redirect_uris
+    case params["redirect_uris"] do
+      uris when is_list(uris) and length(uris) > 0 ->
+        if Enum.all?(uris, &valid_uri?/1) do
+          {:ok, params}
+        else
+          {:error, :invalid_redirect_uri}
+        end
+
+      _ ->
+        {:error, :invalid_redirect_uri}
+    end
+  end
+
+  defp valid_uri?(uri) when is_binary(uri) do
+    case URI.parse(uri) do
+      %URI{scheme: scheme, host: host} when scheme in ["http", "https"] and is_binary(host) ->
+        true
+
+      _ ->
+        false
+    end
+  end
+
+  defp valid_uri?(_), do: false
+
+  defp generate_client_id do
+    SecureRandom.uuid()
+  end
+
+  defp generate_registration_access_token do
+    :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+  end
+
+  defp parse_scopes(scope_string) when is_binary(scope_string) do
+    String.split(scope_string, " ", trim: true)
+  end
+
+  defp parse_scopes(_), do: nil
+
   def default_scopes,
     do: [
-      %{name: "openid"},
-      %{name: "identity"},
-      %{name: "data:public"},
-      %{name: "follow"},
-      %{name: "profile"},
-      %{name: "push"},
-      %{name: "admin:read"},
-      %{name: "admin:read:accounts"},
-      %{name: "admin:read:canonical_email_blocks"},
-      %{name: "admin:read:domain_allows"},
-      %{name: "admin:read:domain_blocks"},
-      %{name: "admin:read:email_domain_blocks"},
-      %{name: "admin:read:ip_blocks"},
-      %{name: "admin:read:reports"},
-      %{name: "admin:write"},
-      %{name: "admin:write:accounts"},
-      %{name: "admin:write:canonical_email_blocks"},
-      %{name: "admin:write:domain_allows"},
-      %{name: "admin:write:domain_blocks"},
-      %{name: "admin:write:email_domain_blocks"},
-      %{name: "admin:write:ip_blocks"},
-      %{name: "admin:write:reports"},
-      %{name: "read"},
-      %{name: "read:accounts"},
-      %{name: "read:blocks"},
-      %{name: "read:bookmarks"},
-      %{name: "read:favourites"},
-      %{name: "read:filters"},
-      %{name: "read:follows"},
-      %{name: "read:lists"},
-      %{name: "read:mutes"},
-      %{name: "read:notifications"},
-      %{name: "read:search"},
-      %{name: "read:statuses"},
-      %{name: "write"},
-      %{name: "write:accounts"},
-      %{name: "write:blocks"},
-      %{name: "write:bookmarks"},
-      %{name: "write:conversations"},
-      %{name: "write:favourites"},
-      %{name: "write:filters"},
-      %{name: "write:follows"},
-      %{name: "write:lists"},
-      %{name: "write:media"},
-      %{name: "write:mutes"},
-      %{name: "write:notifications"},
-      %{name: "write:reports"},
-      %{name: "write:statuses"}
+      "openid",
+      "identity",
+      "data:public",
+      "follow",
+      "profile",
+      "email",
+      "offline_access",
+      "push",
+      "admin:read",
+      "admin:read:accounts",
+      "admin:read:canonical_email_blocks",
+      "admin:read:domain_allows",
+      "admin:read:domain_blocks",
+      "admin:read:email_domain_blocks",
+      "admin:read:ip_blocks",
+      "admin:read:reports",
+      "admin:write",
+      "admin:write:accounts",
+      "admin:write:canonical_email_blocks",
+      "admin:write:domain_allows",
+      "admin:write:domain_blocks",
+      "admin:write:email_domain_blocks",
+      "admin:write:ip_blocks",
+      "admin:write:reports",
+      "read",
+      "read:accounts",
+      "read:blocks",
+      "read:bookmarks",
+      "read:favourites",
+      "read:filters",
+      "read:follows",
+      "read:lists",
+      "read:mutes",
+      "read:notifications",
+      "read:search",
+      "read:statuses",
+      "write",
+      "write:accounts",
+      "write:blocks",
+      "write:bookmarks",
+      "write:conversations",
+      "write:favourites",
+      "write:filters",
+      "write:follows",
+      "write:lists",
+      "write:media",
+      "write:mutes",
+      "write:notifications",
+      "write:reports",
+      "write:statuses"
     ]
 end

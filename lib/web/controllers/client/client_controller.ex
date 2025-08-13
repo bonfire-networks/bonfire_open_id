@@ -13,7 +13,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
         #  redirect to authorization URL
         if params == %{} do
           # start flow: redirect to remote authorization URL
-          redirect_to(conn, openid_provider_url(provider, provider_config), type: :maybe_external)
+          case openid_provider_url(provider, provider_config) do
+            {:ok, url} when is_binary(url) ->
+              redirect_to(conn, url, type: :maybe_external)
+
+            other ->
+              info(provider_config, "provider")
+              error(other, "OpenID redirect URL could not be generated for provider: #{provider}")
+          end
         else
           # callback after coming back from remote 
           with_open_id_connect(conn, provider, Map.new(provider_config), params)
@@ -71,13 +78,29 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   def openid_provider_url(provider, config \\ nil) do
-    Utils.ok_unwrap(
-      Map.new(config || Client.open_id_connect_providers()[provider])
-      |> OpenIDConnect.authorization_uri(openid_callback_url(provider), %{
-        "state" => Bonfire.Common.Text.random_string(),
-        "nonce" => Bonfire.Common.Text.random_string()
-      })
-    )
+    provider_config = Map.new(config || Client.open_id_connect_providers()[provider])
+
+    # Base parameters
+    base_params = %{
+      "state" => Bonfire.Common.Text.random_string(),
+      "nonce" => Bonfire.Common.Text.random_string()
+    }
+
+    # Add PKCE parameters if present in config
+    additional_params =
+      case provider_config do
+        %{pkce: true, code_challenge: code_challenge, code_challenge_method: method} ->
+          Map.merge(base_params, %{
+            "code_challenge" => code_challenge,
+            "code_challenge_method" => method
+          })
+
+        _ ->
+          base_params
+      end
+
+    provider_config
+    |> OpenIDConnect.authorization_uri(openid_callback_url(provider), additional_params)
   end
 
   defp with_oauth2(

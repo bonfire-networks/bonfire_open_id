@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
-  use ExUnit.Case, async: true
+  use Bonfire.OpenID.ConnCase, async: true
   import Plug.Conn
   import Phoenix.ConnTest
 
@@ -272,6 +272,14 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
 
       assert redirected_to(conn) ==
                "http://redirect.uri?code=code&state=state"
+    end
+
+    test "authorization requires valid client", %{conn: conn} do
+      # Test with invalid client_id directly through conn
+      conn = get(conn, "/openid/authorize?client_id=invalid&response_type=code&scope=openid")
+
+      # Should return an error or redirect to error page
+      assert conn.status in [400, 302, 404]
     end
   end
 

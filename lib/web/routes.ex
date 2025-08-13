@@ -45,21 +45,40 @@ defmodule Bonfire.OpenID.Web.Routes do
         post("/introspect", IntrospectController, :introspect)
       end
 
-      scope "/oauth", Bonfire.OpenID.Web.Oauth do
+      scope "/oauth" do
         pipe_through([:check_provider_enabled, :basic, :load_current_auth, :validate_client_id])
 
-        get("/authorize", AuthorizeController, :authorize)
-        post("/authorize", AuthorizeController, :authorize)
-        get("/ready", ReadyController, :ready)
+        get("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
+        post("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
+        get("/ready", Bonfire.OpenID.Web.Oauth.ReadyController, :ready)
+
+        get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
+        post("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
       end
 
-      scope "/openid", Bonfire.OpenID.Web.Openid do
+      scope "/openid" do
         pipe_through([:check_provider_enabled, :basic, :load_current_auth])
 
-        get("/authorize", AuthorizeController, :authorize)
-        get("/userinfo", UserinfoController, :userinfo)
-        post("/userinfo", UserinfoController, :userinfo)
-        get("/jwks", JwksController, :jwks_index)
+        get("/authorize", Bonfire.OpenID.Web.Openid.AuthorizeController, :authorize)
+        get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
+        post("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
+        get("/jwks", Bonfire.OpenID.Web.Openid.JwksController, :jwks_index)
+        post("/token", Bonfire.OpenID.Web.Oauth.TokenController, :token)
+
+        # dynamic client registration routes
+        post "/register", Bonfire.OpenID.Web.Openid.ClientRegistrationController, :register
+
+        get "/register/:client_id",
+            Bonfire.OpenID.Web.Openid.ClientRegistrationController,
+            :retrieve
+
+        put "/register/:client_id",
+            Bonfire.OpenID.Web.Openid.ClientRegistrationController,
+            :update
+
+        delete "/register/:client_id",
+               Bonfire.OpenID.Web.Openid.ClientRegistrationController,
+               :delete
       end
 
       scope "/.well-known", Bonfire.OpenID.Web.Openid do

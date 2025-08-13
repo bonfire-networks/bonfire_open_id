@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
-  use ExUnit.Case, async: true
+  use Bonfire.OpenID.ConnCase, async: true
   import Phoenix.ConnTest
 
   import Mox
@@ -15,7 +15,6 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
   end
 
   describe "userinfo/2" do
-    @tag :must
     test "returns an error if unauthorized", %{conn: conn} do
       error = %Error{
         status: :bad_request,
@@ -37,7 +36,6 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
              ]
     end
 
-    @tag :must
     test "returns userinfo response", %{conn: conn} do
       resource_owner_claims = %{
         "sub" => "1",
@@ -53,6 +51,18 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
 
       assert json_response(conn, 200) == resource_owner_claims
     end
+
+    # test "userinfo endpoint requires valid access token via conn", %{conn: conn} do
+    #   # Try without authorization header
+    #   conn = get(conn, "/openid/userinfo")
+    #   assert conn.status == 401
+
+    #   # Try with invalid token
+    #   conn = conn
+    #   |> put_req_header("authorization", "Bearer invalid_token")
+    #   |> get("/openid/userinfo")
+    #   assert conn.status == 401
+    # end
   end
 
   def jwk_keys_fixture do

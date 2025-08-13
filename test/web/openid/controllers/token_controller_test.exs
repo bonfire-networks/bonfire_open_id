@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.Controllers.Openid.TokenControllerTest do
-  use ExUnit.Case, async: true
+  use Bonfire.OpenID.ConnCase, async: true
   import Phoenix.ConnTest
 
   import Mox

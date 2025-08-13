@@ -20,6 +20,7 @@ defmodule Bonfire.OpenID.Web.OpenidView do
       ],
       "issuer" => "#{base_url}",
       "jwks_uri" => "#{base_url}/openid/jwks",
+      "registration_endpoint" => "#{base_url}/openid/register",
       "response_types_supported" => [
         "client_credentials",
         "password",
@@ -32,7 +33,9 @@ defmodule Bonfire.OpenID.Web.OpenidView do
       "subject_types_supported" => [
         "public"
       ],
-      "token_endpoint" => "#{base_url}/oauth/token",
+      # TODO: replace with actual scopes we want to use as a provider
+      "scopes_supported" => Bonfire.OpenID.Provider.ClientApps.default_scopes(),
+      "token_endpoint" => "#{base_url}/openid/token",
       "userinfo_endpoint" => "#{base_url}/openid/userinfo"
     }
   end

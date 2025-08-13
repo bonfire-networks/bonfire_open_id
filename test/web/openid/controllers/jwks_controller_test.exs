@@ -1,5 +1,5 @@
 defmodule Bonfire.OpenID.Web.Controllers.Openid.JwksControllerTest do
-  use ExUnit.Case, async: true
+  use Bonfire.OpenID.ConnCase, async: true
   import Phoenix.ConnTest
 
   import Mox
@@ -13,6 +13,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.JwksControllerTest do
   end
 
   describe "jwks_index/2" do
+    @tag :with_mox
     test "returns jwks response", %{conn: conn} do
       jwk_keys = jwk_keys_fixture()
 
@@ -27,6 +28,15 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.JwksControllerTest do
                "keys" => jwk_keys
              }
     end
+
+    # test "can fetch JWKS endpoint directly", %{conn: conn} do
+    #   conn = get(conn, "/openid/jwks")
+
+    #   assert conn.status == 200
+    #   assert %{"keys" => keys} = json_response(conn, 200)
+    #   assert is_list(keys)
+    #   # Keys should be the actual ones from your configured RSA keys
+    # end
   end
 
   def jwk_keys_fixture do
