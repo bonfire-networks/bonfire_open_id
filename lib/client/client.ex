@@ -19,30 +19,31 @@ defmodule Bonfire.OpenID.Client do
         {provider, config |> Enum.into(%{redirect_uri: provider_url(provider, :oauth)})}
       end)
 
+  def providers() do
+    open_id_connect_providers() ++ oauth2_providers()
+  end
+
+  def providers_for(source \\ :login) do
+    providers()
+    |> Enum.reject(fn {_provider, config} ->
+      source == :signup and config[:only_supports_login]
+    end)
+  end
+
   def provider_config(provider) do
     with provider when is_atom(provider) <- Types.maybe_to_atom(provider) do
-      Client.open_id_connect_providers()[provider] || Client.oauth2_providers()[provider]
+      open_id_connect_providers()[provider] || oauth2_providers()[provider]
     end
   end
 
   def providers_authorization_urls(source \\ :login) do
-    #  provider_url(provider, :openid)
-    (for {provider, config} <- open_id_connect_providers() do
-       unless source == :signup and config[:only_supports_login],
-         do: {
-           config[:display_name] || provider,
-           config[:redirect_uri]
-         }
-     end ++
-       for {provider, config} <- oauth2_providers() do
-         unless source == :signup and config[:only_supports_login],
-           do: {
-             config[:display_name] || provider,
-             config[:redirect_uri]
-             #  provider_url(provider, :oauth)
-           }
-       end)
-    |> Enum.reject(&is_nil/1)
+    for {provider, config} <- providers_for(source) do
+      {
+        config[:display_name] || provider,
+        config[:redirect_uri]
+        #  provider_url(provider, :openid)
+      }
+    end
   end
 
   defp provider_url(provider, type) do

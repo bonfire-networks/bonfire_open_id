@@ -402,7 +402,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
     auth_code = query_params["code"]
 
     assert auth_code,
-           flood(query_params, "auth_code missing in query_params") &&
+           debug(query_params, "auth_code missing in query_params") &&
              "Should receive authorization code"
 
     # Exchange code for tokens
@@ -429,7 +429,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
     assert access_token, "Should receive access token"
 
     assert refresh_token,
-           flood(token_response, "refresh_token missing in body") &&
+           debug(token_response, "refresh_token missing in body") &&
              "Should receive refresh token for offline access"
 
     {access_token, refresh_token}
@@ -547,7 +547,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
       doc
       |> Floki.find("input[name=_csrf_token]")
       |> Floki.attribute("value")
-      |> List.first() || (flood(doc) && raise "CSRF token not found")
+      |> List.first() || (debug(doc) && raise "CSRF token not found")
 
     go_url =
       doc

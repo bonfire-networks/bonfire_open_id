@@ -96,7 +96,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         }
       ) do
     if error == :invalid_client do
-      flood(repo().all(Boruta.Ecto.Client), "known clients")
+      debug(repo().all(Boruta.Ecto.Client), "known clients")
     end
 
     error(error, inspect(error_description))

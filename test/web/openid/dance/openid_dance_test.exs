@@ -280,7 +280,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
     auth_code = query_params["code"]
 
     assert auth_code,
-           flood(query_params, "Should receive authorization code") &&
+           debug(query_params, "Should receive authorization code") &&
              "Should receive authorization code"
 
     # Get tokens (with or without PKCE)
@@ -522,7 +522,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
     auth_code = query_params["code"]
 
     assert auth_code,
-           flood(query_params, "Dynamic client should receive authorization code") &&
+           debug(query_params, "Dynamic client should receive authorization code") &&
              "Dynamic client should receive authorization code"
 
     # Exchange code for tokens using the same redirect_uri
@@ -629,7 +629,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
     # if "profile" in expected_scopes do
     #   # Should have profile-related claims
     #   profile_present = Enum.any?(profile_claims, &Map.has_key?(claims, &1))
-    #   assert profile_present, flood(profile_claims, "profile_claims") && "ID token should contain profile claims when profile scope requested"
+    #   assert profile_present, debug(profile_claims, "profile_claims") && "ID token should contain profile claims when profile scope requested"
     # end
 
     # if "email" in expected_scopes do
@@ -685,7 +685,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
       )
 
     assert config_response.status == 200,
-           flood(config_response, "Should retrieve client configuration") &&
+           debug(config_response, "Should retrieve client configuration") &&
              "Should retrieve client configuration"
 
     config_data = config_response.body
@@ -755,7 +755,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
       doc
       |> Floki.find("input[name=_csrf_token]")
       |> Floki.attribute("value")
-      |> List.first() || (flood(doc) && raise "CSRF token not found")
+      |> List.first() || (debug(doc) && raise "CSRF token not found")
 
     go_url =
       doc
@@ -779,7 +779,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
       )
 
     assert login_response.status == 303,
-           flood(login_response, "login_response") && "Should redirect after successful login"
+           debug(login_response, "login_response") && "Should redirect after successful login"
 
     login_response
   end
