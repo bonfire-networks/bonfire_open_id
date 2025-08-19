@@ -116,5 +116,24 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           enable_signup: true
         ]
     end
+
+    # WIP: connect as a client to the works.hcommons.org OAuth2 provider with callback url https://yourinstance.tld/oauth/client/kcworks
+    if kcworks_client_id = System.get_env("KCWORKS_CLIENT_ID") do
+      base_uri = "https://works.hcommons.org"
+
+      config :bonfire_open_id, :oauth2_providers,
+        kcworks: [
+          display_name: System.get_env("KCWORKS_DISPLAY_NAME", "Knowledge Commons Works"),
+          client_id: kcworks_client_id,
+          client_secret: System.get_env("KCWORKS_CLIENT_SECRET"),
+          authorize_uri: "#{base_uri}/oauth/authorize",
+          access_token_uri: "#{base_uri}/oauth/token",
+          userinfo_uri: "#{base_uri}/api/me",
+          grant_type: System.get_env("KCWORKS_GRANT_TYPE", "authorization_code"),
+          # scope: System.get_env("KCWORKS_SCOPE", "deposit:write deposit:actions"),
+          scope: System.get_env("KCWORKS_SCOPE", "deposit:write"),
+          enable_signup: true
+        ]
+    end
   end
 end

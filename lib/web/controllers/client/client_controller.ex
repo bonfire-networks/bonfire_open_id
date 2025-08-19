@@ -22,8 +22,13 @@ defmodule Bonfire.OpenID.Web.ClientController do
               error(other, "OpenID redirect URL could not be generated for provider: #{provider}")
           end
         else
-          # callback after coming back from remote 
-          with_open_id_connect(conn, provider, Map.new(provider_config), params)
+          # error or callback after coming back from remote 
+          process_and_maybe_raise_error(
+            conn,
+            params,
+            l("An error occurred when trying to sign in with OpenID"),
+            false
+          ) || with_open_id_connect(conn, provider, Map.new(provider_config), params)
         end
       else
         if provider_config = Client.oauth2_providers()[provider] do
@@ -34,8 +39,13 @@ defmodule Bonfire.OpenID.Web.ClientController do
               type: :maybe_external
             )
           else
-            # callback after coming back from remote 
-            with_oauth2(conn, provider, Map.new(provider_config), params)
+            # error or callback after coming back from remote 
+            process_and_maybe_raise_error(
+              conn,
+              params,
+              l("An error occurred when trying to sign in with OAuth2"),
+              false
+            ) || with_oauth2(conn, provider, Map.new(provider_config), params)
           end
         else
           raise Bonfire.Fail, {:not_found, "Provider #{inspect(provider)}"}
@@ -215,25 +225,42 @@ defmodule Bonfire.OpenID.Web.ClientController do
 
   defp process_body_error(conn, body, error_msg) when is_binary(body) do
     case Jason.decode(body) do
-      {:ok, %{"error_description" => e} = body} ->
-        process_body_error(conn, body, e || error_msg)
-
-      {:ok, %{"error" => e} = body} ->
-        process_body_error(conn, body, e || error_msg)
-
-      {:ok, _} = body ->
-        process_body_error(conn, body, error_msg)
+      {:ok, body} ->
+        process_and_maybe_raise_error(conn, body, error_msg)
 
       _ ->
-        process_body_error(conn, body, error_msg)
+        process_and_maybe_raise_error(conn, body, error_msg)
     end
   end
 
   defp process_body_error(conn, {_, body}, error_msg) do
-    process_body_error(conn, body, error_msg)
+    process_and_maybe_raise_error(conn, body, error_msg)
   end
 
   defp process_body_error(conn, body, error_msg) do
+    process_and_maybe_raise_error(conn, body, error_msg)
+  end
+
+  defp process_and_maybe_raise_error(conn, data_or_params, error_msg, force? \\ true)
+
+  defp process_and_maybe_raise_error(conn, %{} = data_or_params, error_msg, force?) do
+    case data_or_params do
+      %{"error_description" => e} = data_or_params ->
+        raise_error(conn, data_or_params, e || error_msg)
+
+      %{"error" => e} = body ->
+        raise_error(conn, data_or_params, e || error_msg)
+
+      _ ->
+        if force?, do: raise_error(conn, data_or_params, error_msg), else: false
+    end
+  end
+
+  defp process_and_maybe_raise_error(conn, data_or_params, error_msg, force?) do
+    if force?, do: raise_error(conn, data_or_params, error_msg), else: false
+  end
+
+  defp raise_error(_conn, body, error_msg) do
     error(body, error_msg)
 
     raise Bonfire.Fail, {:unknown, error_msg}
