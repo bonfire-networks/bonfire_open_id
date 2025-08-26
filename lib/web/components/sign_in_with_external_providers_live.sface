@@ -2,7 +2,9 @@
   {#match providers when providers != []}
     <span class="text-sm text-center font-semibold">{@label || l("Sign in with an external account")}</span>
     <div class="flex flex-col gap-2 mt-3">
-      {#for {provider, provider_config} <- providers}
+      {#for {provider, provider_config} <-
+          providers
+          |> Bonfire.OpenID.Web.SignInWithExternalProvidersLive.filter_providers(@include_providers)}
         {#case provider}
           {#match :orcid}
             <LinkLive
