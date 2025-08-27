@@ -12,14 +12,28 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
     with [authorization_header] <- get_req_header(conn, "authorization"),
          [_authorization_header, bearer] <- Regex.run(~r/[B|b]earer (.+)/, authorization_header),
          {:ok, token} <- AccessToken.authorize(value: bearer),
-         %{} = user <- Bonfire.Me.Users.get_current(token.sub) do
+         %{} = user <-
+           Bonfire.Me.Users.get_current(token.sub) ||
+             {:error, "No user found for #{inspect(token.sub)}"} do
       conn
       # |> assign(:current_bearer_token, bearer)
       |> assign(:current_token, token)
       |> assign(:current_user, user)
     else
+      {:error, reason} ->
+        error(reason, "Could not load or verify Bearer authorization")
+        nil
+
+      [] ->
+        debug("Could not find Bearer authorization")
+        nil
+
+      other when is_list(other) ->
+        debug(other, "Could not find valid Bearer authorization")
+        nil
+
       other ->
-        info(other, "Could not load authorization")
+        debug(other, "Could not load authorization")
         nil
     end
   end
