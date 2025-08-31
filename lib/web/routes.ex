@@ -41,12 +41,17 @@ defmodule Bonfire.OpenID.Web.Routes do
         pipe_through([:check_provider_enabled, :basic, :validate_client_id])
 
         post("/revoke", RevokeController, :revoke)
-        post("/token", TokenController, :token)
         post("/introspect", IntrospectController, :introspect)
       end
-
+      
+      # OAuth token endpoint with PKCE fix for public clients
+      scope "/oauth", Bonfire.OpenID.Web.Oauth do
+        pipe_through([:check_provider_enabled, :basic, :validate_client_id, Bonfire.OpenID.Web.Plugs.PKCEFix])
+        
+        post("/token", TokenController, :token)
+      end
       scope "/oauth" do
-        pipe_through([:check_provider_enabled, :basic, :load_current_auth, :validate_client_id])
+        pipe_through([:check_provider_enabled, :basic, :validate_client_id, :load_current_auth])
 
         get("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
         post("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
