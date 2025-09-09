@@ -12,7 +12,7 @@
               class="btn flex items-center gap-3 w-full btn-orcid py-3 px-4"
             >
               <#Icon iconify="academicons:orcid" class="w-8 h-8" />
-              <span class="flex-1 text-left">{l("Sign in with Orcid")}</span>
+              <span class="flex-1 text-left">{l("Sign in with ORCID")}</span>
             </LinkLive>
           {#match :zenodo}
             <LinkLive
