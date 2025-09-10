@@ -4,6 +4,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
 
   @moduletag :test_instance
 
+  use Arrows
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
   use Bonfire.Common.E
@@ -26,7 +27,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
                supported_scopes: ["identity", "data:public", "read", "write"]
              })
              |> debug("client created?")
-             |> Utils.ok_unwrap()
+             |> from_ok()
 
     %{
       client: client,
@@ -276,7 +277,7 @@ defmodule Bonfire.OpenID.OAuthDanceTest do
                  confidential: false
                })
                |> debug("public client created")
-               |> Utils.ok_unwrap()
+               |> from_ok()
 
       # Get tokens for public client
       {access_token, _refresh_token} =

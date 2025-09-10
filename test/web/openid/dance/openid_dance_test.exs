@@ -4,6 +4,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
 
   @moduletag :test_instance
 
+  use Arrows
   import Untangle
   import Bonfire.Common.Config, only: [repo: 0]
   use Bonfire.Common.E
@@ -25,7 +26,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
                redirect_uris: [redirect_uri],
                supported_scopes: ["openid", "profile", "email", "identity", "data:public"]
              })
-             |> Utils.ok_unwrap()
+             |> from_ok()
 
     %{
       client: client,
@@ -82,7 +83,7 @@ defmodule Bonfire.OpenID.OIDCDanceTest do
                confidential: false
              })
              |> debug("public PKCE client created")
-             |> Utils.ok_unwrap()
+             |> from_ok()
 
     # Test PKCE flow with public client
     test_oidc_flow(Map.put(context, :client, public_client), %{
