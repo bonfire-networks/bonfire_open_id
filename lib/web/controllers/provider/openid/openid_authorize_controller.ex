@@ -50,6 +50,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         end
       end)
       |> info()
+      |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
 
     authorize(%{conn | query_params: query_params}, query_params)
   end

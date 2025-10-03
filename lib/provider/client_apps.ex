@@ -8,6 +8,61 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   defdelegate list_scopes, to: Boruta.Ecto.Admin
   defdelegate list_active_tokens, to: Boruta.Ecto.Admin
 
+  # TODO: put in config 
+  def default_scopes,
+    do: [
+      "openid",
+      "identity",
+      "data:public",
+      "follow",
+      "profile",
+      "email",
+      "offline_access",
+      "push",
+      "admin:read",
+      "admin:read:accounts",
+      "admin:read:canonical_email_blocks",
+      "admin:read:domain_allows",
+      "admin:read:domain_blocks",
+      "admin:read:email_domain_blocks",
+      "admin:read:ip_blocks",
+      "admin:read:reports",
+      "admin:write",
+      "admin:write:accounts",
+      "admin:write:canonical_email_blocks",
+      "admin:write:domain_allows",
+      "admin:write:domain_blocks",
+      "admin:write:email_domain_blocks",
+      "admin:write:ip_blocks",
+      "admin:write:reports",
+      "read",
+      "read:accounts",
+      "read:blocks",
+      "read:bookmarks",
+      "read:favourites",
+      "read:filters",
+      "read:follows",
+      "read:lists",
+      "read:mutes",
+      "read:notifications",
+      "read:search",
+      "read:statuses",
+      "write",
+      "write:accounts",
+      "write:blocks",
+      "write:bookmarks",
+      "write:conversations",
+      "write:favourites",
+      "write:filters",
+      "write:follows",
+      "write:lists",
+      "write:media",
+      "write:mutes",
+      "write:notifications",
+      "write:reports",
+      "write:statuses"
+    ]
+
   def get_or_new(id_or_name, redirect_uri) do
     case get(Types.uid(id_or_name), id_or_name, redirect_uri) |> debug("got") do
       nil -> new(id_or_name, redirect_uri) |> debug("newed")
@@ -91,9 +146,18 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def new(id_or_name, redirect_uris)
       when is_binary(id_or_name) and is_list(redirect_uris) and
              length(redirect_uris) > 0 do
+    id =
+      cond do
+        uuid?(id_or_name) ->
+          id_or_name
+
+        true ->
+          hash_to_uuid(id_or_name)
+      end
+
     new(
       %{
-        id: Types.uid(id_or_name) || SecureRandom.uuid(),
+        id: id,
         name: id_or_name,
         redirect_uris: redirect_uris
       }
@@ -107,13 +171,27 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   end
 
   def new(params) when is_map(params) do
+    # Ensure id is a UUID, and store original if not
+    id =
+      case params[:id] do
+        nil ->
+          generate_client_id()
+
+        id ->
+          if uuid?(id) do
+            id
+          else
+            hash_to_uuid(id)
+          end
+      end
+
     %{
       # OAuth client_id
-      id: Types.uid(params[:id]) || generate_client_id(),
+      id: id,
       # OAuth client_secret
       secret: SecureRandom.hex(64),
       # Display name
-      name: "Client app",
+      name: Map.get(params, :name) || params[:id] || "Client app",
       # one day
       access_token_ttl: 60 * 60 * 24,
       # one minute
@@ -411,57 +489,52 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   defp parse_scopes(_), do: nil
 
-  def default_scopes,
-    do: [
-      "openid",
-      "identity",
-      "data:public",
-      "follow",
-      "profile",
-      "email",
-      "offline_access",
-      "push",
-      "admin:read",
-      "admin:read:accounts",
-      "admin:read:canonical_email_blocks",
-      "admin:read:domain_allows",
-      "admin:read:domain_blocks",
-      "admin:read:email_domain_blocks",
-      "admin:read:ip_blocks",
-      "admin:read:reports",
-      "admin:write",
-      "admin:write:accounts",
-      "admin:write:canonical_email_blocks",
-      "admin:write:domain_allows",
-      "admin:write:domain_blocks",
-      "admin:write:email_domain_blocks",
-      "admin:write:ip_blocks",
-      "admin:write:reports",
-      "read",
-      "read:accounts",
-      "read:blocks",
-      "read:bookmarks",
-      "read:favourites",
-      "read:filters",
-      "read:follows",
-      "read:lists",
-      "read:mutes",
-      "read:notifications",
-      "read:search",
-      "read:statuses",
-      "write",
-      "write:accounts",
-      "write:blocks",
-      "write:bookmarks",
-      "write:conversations",
-      "write:favourites",
-      "write:filters",
-      "write:follows",
-      "write:lists",
-      "write:media",
-      "write:mutes",
-      "write:notifications",
-      "write:reports",
-      "write:statuses"
-    ]
+  # workaround for Boruta: If client_id is not a UUID, hash and encode as UUID, and store original.
+  def maybe_transform_client_id(params) do
+    case Map.get(params, "client_id") do
+      nil ->
+        params
+
+      client_id ->
+        if uuid?(client_id) do
+          params
+        else
+          params
+          |> Map.put("original_client_id", client_id)
+          |> Map.put("client_id", hash_to_uuid(client_id))
+        end
+    end
+  end
+
+  @doc """
+  Returns true if the given string is a UUID.
+
+      iex> Bonfire.OpenID.Provider.ClientApps.uuid?("b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e")
+      true
+      iex> Bonfire.OpenID.Provider.ClientApps.uuid?("https://foo.bar")
+      false
+  """
+  def uuid?(
+        <<a::binary-size(8), "-", b::binary-size(4), "-", c::binary-size(4), "-",
+          d::binary-size(4), "-", e::binary-size(12)>>
+      ) do
+    Enum.all?([a, b, c, d, e], &String.match?(&1, ~r/^[0-9a-fA-F]+$/))
+  end
+
+  def uuid?(_), do: false
+
+  @doc """
+  Hashes a string and encodes it as a UUID.
+
+      iex> uuid = Bonfire.OpenID.Provider.ClientApps.hash_to_uuid("https://foo.bar")
+      iex> Bonfire.OpenID.Provider.ClientApps.uuid?(uuid)
+      true
+  """
+  def hash_to_uuid(str) do
+    <<a::binary-size(16), _::binary>> = :crypto.hash(:sha256, str)
+    <<d1::32, d2::16, d3::16, d4::16, d5::48>> = a
+
+    :io_lib.format("~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b", [d1, d2, d3, d4, d5])
+    |> IO.iodata_to_binary()
+  end
 end

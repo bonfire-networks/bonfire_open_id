@@ -21,6 +21,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   def from_query_string(conn, query) do
     query_params =
       Plug.Conn.Query.decode(query)
+      |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
       |> debug()
 
     authorize(%{conn | query_params: query_params}, query_params)

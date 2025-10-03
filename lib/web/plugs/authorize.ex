@@ -39,14 +39,18 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
   end
 
   def authorize(conn, [_h | _t] = required_scopes) do
-    current_scopes = Scope.split(conn.assigns[:current_token].scope)
-
-    case Enum.empty?(required_scopes -- current_scopes) do
+    case authorized_scopes?(conn, required_scopes) do
       true ->
         conn
 
       false ->
         raise Bonfire.Fail, :unauthorized
     end
+  end
+
+  def authorized_scopes?(conn, required_scopes) do
+    current_scopes = Scope.split(conn.assigns[:current_token].scope)
+
+    Enum.empty?(List.wrap(required_scopes) -- current_scopes)
   end
 end
