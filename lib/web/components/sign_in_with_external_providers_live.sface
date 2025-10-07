@@ -7,13 +7,29 @@
           |> Bonfire.OpenID.Web.SignInWithExternalProvidersLive.filter_providers(@include_providers)}
         {#case provider}
           {#match :orcid}
+          <div class="flex items-center gap-2">
             <LinkLive
               to={provider_config[:redirect_uri]}
-              class="btn flex items-center gap-3 w-full btn-orcid py-3 px-4"
+              class="btn flex items-center gap-3 flex-1 btn-orcid py-3 px-4"
             >
               <#Icon iconify="academicons:orcid" class="w-8 h-8" />
               <span class="flex-1 text-left">{l("Sign in with ORCID")}</span>
             </LinkLive>
+            <!-- Open the modal using ID.showModal() method -->
+          
+          <button type="button" class="btn btn-sm btn-circle btn-info btn-soft btn-square" onclick="orcid_info.showModal()"><#Icon iconify="ph:question-mark-duotone" /></button>
+          <dialog id="orcid_info" class="modal">
+              <div class="modal-box">
+                <h3 class="text-lg font-bold">{l "What is ORCID ID?"}</h3>
+                <p class="py-4">{l "ORCID is a free, unique identifier for researchers that helps you save time when signing into systems. By authenticating with ORCID, we automatically collect your correct ORCID iD, preventing errors that can occur when manually typing identifiers. This ensures accurate attribution of your work and allows you to spend more time on research and less time managing it."} <a class="link" href="https://orcid.org">{l"Learn more at orcid.org"}</a></p>
+                <div class="modal-action">
+                  <form method="dialog" class="modal-action">
+                    <button class="btn" type="submit">close</button>
+                  </form>
+                </div>
+              </div>
+            </dialog>
+            </div>
           {#match :zenodo}
             <LinkLive
               to={provider_config[:redirect_uri]}
