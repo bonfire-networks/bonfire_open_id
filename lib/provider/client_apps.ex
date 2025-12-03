@@ -194,7 +194,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       name: Map.get(params, :name) || params[:id] || "Client app",
       # one day
       access_token_ttl: 60 * 60 * 24,
-      # one minute
+      # one minutes
       authorization_code_ttl: 60,
       # one month
       refresh_token_ttl: 60 * 60 * 24 * 30,
