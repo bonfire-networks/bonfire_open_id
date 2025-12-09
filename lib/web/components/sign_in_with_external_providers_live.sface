@@ -1,6 +1,6 @@
 {#case maybe_apply(Bonfire.OpenID.Client, :providers_for, [@source], fallback_return: [])}
   {#match providers when providers != []}
-    <span class="text-sm text-center font-semibold">{@label || l("Sign in with an external account")}</span>
+    <span class="text-sm text-center">{@label || l("Sign in with an external account")}</span>
     <div class="flex flex-col gap-2 mt-3">
       {#for {provider, provider_config} <-
           providers
