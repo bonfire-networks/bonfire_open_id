@@ -71,4 +71,34 @@ defmodule Bonfire.OpenID.Web.OauthView do
     error(error, to_string(error_description))
     error_description
   end
+
+  def render("oauth-authorization-server.json", _) do
+    base_url = Bonfire.Common.URIs.base_url()
+
+    %{
+      "issuer" => base_url,
+      "authorization_endpoint" => "#{base_url}/openid/authorize",
+      "token_endpoint" => "#{base_url}/openid/token",
+      "registration_endpoint" => "#{base_url}/openid/register",
+      "revocation_endpoint" => "#{base_url}/openid/revoke",
+      "introspection_endpoint" => "#{base_url}/openid/introspect",
+      "scopes_supported" => Bonfire.OpenID.Provider.ClientApps.default_scopes(),
+      "response_types_supported" => [
+        "client_credentials",
+        "password",
+        "authorization_code",
+        "refresh_token",
+        "implicit",
+        "revoke",
+        "introspect"
+      ],
+      "grant_types_supported" => [
+        "authorization_code",
+        "implicit",
+        "password",
+        "client_credentials",
+        "refresh_token"
+      ]
+    }
+  end
 end

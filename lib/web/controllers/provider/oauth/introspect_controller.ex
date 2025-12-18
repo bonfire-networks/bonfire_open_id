@@ -32,4 +32,10 @@ defmodule Bonfire.OpenID.Web.Oauth.IntrospectController do
     |> put_view(OauthView)
     |> render("error.json", error: error, error_description: error_description)
   end
+
+  def oauth_metadata(conn, _) do
+    conn
+    |> put_view(Bonfire.OpenID.Web.OauthView)
+    |> render("oauth-authorization-server.json")
+  end
 end

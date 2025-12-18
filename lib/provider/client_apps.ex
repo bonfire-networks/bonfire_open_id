@@ -68,9 +68,11 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
     case get(id, id_or_name, redirect_uri) |> debug("got") do
       nil ->
-        new(id, id_or_name, redirect_uri) 
-        |> debug("newed") 
-      client -> {:ok, client}
+        new(id, id_or_name, redirect_uri)
+        |> debug("newed")
+
+      client ->
+        {:ok, client}
     end
   end
 
@@ -148,19 +150,18 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   def id_or_name_to_id(id_or_name) do
     cond do
-        uuid?(id_or_name) ->
-          id_or_name
+      uuid?(id_or_name) ->
+        id_or_name
 
-        true ->
-          hash_to_uuid(id_or_name)
-      end
+      true ->
+        hash_to_uuid(id_or_name)
     end
+  end
 
   @doc "Define an OAuth client app, providing a name and redirect URI(s)"
   def new(id \\ nil, id_or_name, redirect_uris)
       when is_binary(id_or_name) and is_list(redirect_uris) and
              length(redirect_uris) > 0 do
-      
     new(
       %{
         id: id || id_or_name_to_id(id_or_name),

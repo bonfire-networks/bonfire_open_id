@@ -27,7 +27,6 @@ defmodule Bonfire.OpenID do
     end
   end
 
-
   def get_user(id_or_username) when is_binary(id_or_username) do
     with %{id: _user_id} = user <- Users.get_current(id_or_username) do
       get_user(user)

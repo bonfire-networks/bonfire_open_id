@@ -49,6 +49,7 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
               conn.body_params
               |> Map.put("client_id", id)
         }
+
       {:error, changeset} ->
         # Assign error and halt the conn, or handle as needed
         conn

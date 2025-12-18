@@ -42,9 +42,9 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
 
   defp maybe_fallback_load_authorization(conn, opts) do
     if module = Extend.maybe_module(Bonfire.UI.Me.Plugs.LoadCurrentUser) do
-            module.call(conn, opts)
-          end
-        end
+      module.call(conn, opts)
+    end
+  end
 
   def authorize(conn, [_h | _t] = required_scopes) do
     case authorized_scopes?(conn, required_scopes) do

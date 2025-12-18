@@ -84,7 +84,13 @@ defmodule Bonfire.OpenID.Web.Routes do
       scope "/.well-known", Bonfire.OpenID.Web.Openid do
         pipe_through([:check_provider_enabled, :basic])
 
-        get("/openid-configuration", UserinfoController, :discovery)
+        get("/openid-configuration", UserinfoController, :openid_discovery)
+      end
+
+      scope "/.well-known", Bonfire.OpenID.Web.Oauth do
+        pipe_through([:check_provider_enabled, :basic])
+
+        get("/oauth-authorization-server", IntrospectController, :oauth_metadata)
       end
     end
   end
