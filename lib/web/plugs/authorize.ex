@@ -4,11 +4,13 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
   alias Boruta.Oauth.Authorization.AccessToken
   alias Boruta.Oauth.Scope
 
-  def load_authorization(conn, _opts) do
-    maybe_load_authorization(conn) || conn
+  alias Bonfire.Common.Extend
+
+  def load_authorization(conn, opts) do
+    maybe_load_authorization(conn, opts) || conn
   end
 
-  def maybe_load_authorization(conn, _opts \\ []) do
+  def maybe_load_authorization(conn, opts \\ []) do
     with [authorization_header] <- get_req_header(conn, "authorization"),
          [_authorization_header, bearer] <- Regex.run(~r/[B|b]earer (.+)/, authorization_header),
          {:ok, token} <- AccessToken.authorize(value: bearer),
@@ -35,8 +37,14 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
       other ->
         debug(other, "Could not load authorization")
         nil
-    end
+    end || maybe_fallback_load_authorization(conn, opts)
   end
+
+  defp maybe_fallback_load_authorization(conn, opts) do
+    if module = Extend.maybe_module(Bonfire.UI.Me.Plugs.LoadCurrentUser) do
+            module.call(conn, opts)
+          end
+        end
 
   def authorize(conn, [_h | _t] = required_scopes) do
     case authorized_scopes?(conn, required_scopes) do

@@ -18,6 +18,16 @@ defmodule Bonfire.OpenID do
     get_user(sub)
   end
 
+  def get_by(opts) when is_list(opts) do
+    cond do
+      # NOTE: opts can now also include scope
+      Keyword.has_key?(opts, :sub) -> get_user(opts[:sub])
+      Keyword.has_key?(opts, :username) -> get_user(opts[:username])
+      true -> error(opts, "Invalid options to get user")
+    end
+  end
+
+
   def get_user(id_or_username) when is_binary(id_or_username) do
     with %{id: _user_id} = user <- Users.get_current(id_or_username) do
       get_user(user)
