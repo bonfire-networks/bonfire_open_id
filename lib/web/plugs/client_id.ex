@@ -32,23 +32,29 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
 
   defp maybe_register_client(conn, client_id, redirect_uri)
        when is_binary(client_id) and is_binary(redirect_uri) do
-    with {:ok, %{id: id} = _client} <-
-           ClientApps.get_or_new(
-             String.trim(client_id),
-             ClientApps.prepare_redirect_uri(redirect_uri)
-           ) do
-      %{
+    case ClientApps.get_or_new(
+           String.trim(client_id),
+           ClientApps.prepare_redirect_uri(redirect_uri)
+         ) do
+      {:ok, %{id: id} = _client} ->
+        %{
+          conn
+          | query_params:
+              conn.query_params
+              |> Map.put("client_id", id),
+            params:
+              conn.params
+              |> Map.put("client_id", id),
+            body_params:
+              conn.body_params
+              |> Map.put("client_id", id)
+        }
+      {:error, changeset} ->
+        # Assign error and halt the conn, or handle as needed
         conn
-        | query_params:
-            conn.query_params
-            |> Map.put("client_id", id),
-          params:
-            conn.params
-            |> Map.put("client_id", id),
-          body_params:
-            conn.body_params
-            |> Map.put("client_id", id)
-      }
+        |> assign(:client_id_error, changeset)
+        |> Plug.Conn.send_resp(500, "Error when registering with your client_id or redirect_uri")
+        |> Plug.Conn.halt()
     end
   end
 
