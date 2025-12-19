@@ -18,7 +18,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       # client routes
 
       scope "/openid/client", Bonfire.OpenID.Web do
-        pipe_through([:browser, :load_current_auth])
+        pipe_through([:browser, :load_authorization])
 
         # make sure to comment in prod!
         # get("/test", ClientController, :attempt_login_or_create)
@@ -27,7 +27,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/oauth/client", Bonfire.OpenID.Web do
-        pipe_through([:browser, :load_current_auth])
+        pipe_through([:browser, :load_authorization])
 
         # make sure to comment in prod!
         # get("/test", ClientController, :attempt_login_or_create)
@@ -46,18 +46,19 @@ defmodule Bonfire.OpenID.Web.Routes do
       end
 
       scope "/oauth" do
-        pipe_through([:check_provider_enabled, :basic, :load_current_auth, :validate_client_id])
+        pipe_through([:check_provider_enabled, :basic, :load_authorization, :validate_client_id])
 
         get("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
         post("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
         get("/ready", Bonfire.OpenID.Web.Oauth.ReadyController, :ready)
 
+        # NOTE: points to OpenID userinfo endpoint instead
         get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
         post("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
       end
 
       scope "/openid" do
-        pipe_through([:check_provider_enabled, :basic, :load_current_auth])
+        pipe_through([:check_provider_enabled, :basic, :load_authorization])
 
         get("/authorize", Bonfire.OpenID.Web.Openid.AuthorizeController, :authorize)
         get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)

@@ -109,6 +109,14 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     end)
   end
 
+  def scopes_structs(scopes \\ default_scopes()) do
+    List.wrap(scopes)
+    |> Enum.map(fn
+      %{name: scope} -> %Boruta.Oauth.Scope{name: scope}
+      scope -> %Boruta.Oauth.Scope{name: scope}
+    end)
+  end
+
   def update_client(%Boruta.Ecto.Client{} = client, %{} = attrs) do
     Boruta.Ecto.Admin.update_client(client, attrs)
   end

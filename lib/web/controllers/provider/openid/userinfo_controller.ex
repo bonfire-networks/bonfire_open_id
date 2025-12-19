@@ -8,6 +8,7 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
     do: Application.get_env(:bonfire_open_id, :openid_module, Boruta.Openid)
 
   def userinfo(conn, _params) do
+    flood("userinfo called")
     openid_module().userinfo(conn, __MODULE__)
   end
 
@@ -28,7 +29,7 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
       "www-authenticate",
       "error=\"#{error.error}\", error_description=\"#{error.error_description}\""
     )
-    |> send_resp(:unauthorized, "")
+    |> send_resp(:unauthorized, "Could not find userinfo")
   end
 
   def openid_discovery(conn, _) do

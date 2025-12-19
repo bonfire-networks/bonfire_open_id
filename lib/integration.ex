@@ -23,8 +23,9 @@ defmodule Bonfire.OpenID do
       # NOTE: opts can now also include scope
       Keyword.has_key?(opts, :sub) -> get_user(opts[:sub])
       Keyword.has_key?(opts, :username) -> get_user(opts[:username])
-      true -> error(opts, "Invalid options to get user")
+      true -> err(opts, "Invalid options to get user")
     end
+    |> flood("get_by with opts #{inspect(opts)}")
   end
 
   def get_user(id_or_username) when is_binary(id_or_username) do
@@ -42,6 +43,7 @@ defmodule Bonfire.OpenID do
       %{} = user -> get_user(user)
       _ -> error(conn, "User not found")
     end
+    |> flood("get_user with conn")
   end
 
   def get_user(%{id: id} = current_user) do
@@ -57,7 +59,7 @@ defmodule Bonfire.OpenID do
      }}
   end
 
-  def get_user(other), do: error(other, "Could not find user")
+  def get_user(other), do: err(other, "Invalid options to get user")
 
   @impl Boruta.Oauth.ResourceOwners
   def check_password(resource_owner, password) do
@@ -73,9 +75,16 @@ defmodule Bonfire.OpenID do
     end
   end
 
-  @impl Boruta.Oauth.ResourceOwners
-  def authorized_scopes(%ResourceOwner{}), do: []
 
   @impl Boruta.Oauth.ResourceOwners
-  def claims(_resource_owner, _scope), do: %{}
+    def authorized_scopes(%ResourceOwner{} = _resource_owner) do
+      # TODO: customize per user based on instance roles/boundaries
+      Bonfire.OpenID.Provider.ClientApps.scopes_structs()
+    end
+
+    # TODO? https://hexdocs.pm/boruta/3.0.0-beta.4/Boruta.Oauth.ResourceOwners.html#c:claims/2
+      # @impl Boruta.Oauth.ResourceOwners
+  # def claims(_resource_owner, _scope), do: %{}
+
+
 end

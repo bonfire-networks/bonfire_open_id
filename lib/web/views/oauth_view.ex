@@ -77,12 +77,18 @@ defmodule Bonfire.OpenID.Web.OauthView do
 
     %{
       "issuer" => base_url,
-      "authorization_endpoint" => "#{base_url}/openid/authorize",
-      "token_endpoint" => "#{base_url}/openid/token",
-      "registration_endpoint" => "#{base_url}/openid/register",
-      "revocation_endpoint" => "#{base_url}/openid/revoke",
-      "introspection_endpoint" => "#{base_url}/openid/introspect",
+      "authorization_endpoint" => "#{base_url}/oauth/authorize",
+      "token_endpoint" => "#{base_url}/oauth/token",
+      "registration_endpoint" => "#{base_url}/openid/register", # NOTE: points to OpenID dynamic client registration endpoint instead
+      "userinfo_endpoint"=> "#{base_url}/oauth/userinfo",
+      "jwks_uri" => "#{base_url}/openid/jwks", # NOTE: points to OpenID jwks endpoint instead
+      "revocation_endpoint" => "#{base_url}/oauth/revoke",
+      "introspection_endpoint" => "#{base_url}/oauth/introspect",
       "scopes_supported" => Bonfire.OpenID.Provider.ClientApps.default_scopes(),
+      # "token_endpoint_auth_methods_supported"=>
+      #   ["client_secret_basic", "private_key_jwt"],
+      # "token_endpoint_auth_signing_alg_values_supported"=>
+      #   ["RS256"],
       "response_types_supported" => [
         "client_credentials",
         "password",
@@ -98,7 +104,8 @@ defmodule Bonfire.OpenID.Web.OauthView do
         "password",
         "client_credentials",
         "refresh_token"
-      ]
+      ],
+      # "ui_locales_supported" => ["en"]
     }
   end
 end
