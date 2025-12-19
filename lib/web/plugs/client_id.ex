@@ -13,7 +13,7 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
       when is_binary(client_id) and byte_size(client_id) == 36 do
     if Regex.match?(
          ~r/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}/,
-         "foo"
+         client_id
        ),
        do: conn,
        else: maybe_register_client(conn, client_id, redirect_uri)
@@ -32,9 +32,18 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
 
   defp maybe_register_client(conn, client_id, redirect_uri)
        when is_binary(client_id) and is_binary(redirect_uri) do
+    # Detect PKCE (code_challenge/code_challenge_method) in params
+    attrs =
+      if conn.params["code_challenge"] || conn.params["code_challenge_method"] do
+        %{confidential: false, pkce: true}
+      else
+        %{}
+      end
+
     case ClientApps.get_or_new(
            String.trim(client_id),
-           ClientApps.prepare_redirect_uri(redirect_uri)
+           ClientApps.prepare_redirect_uri(redirect_uri),
+           attrs
          ) do
       {:ok, %{id: id} = _client} ->
         %{

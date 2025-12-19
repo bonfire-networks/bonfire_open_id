@@ -18,8 +18,10 @@ defmodule Bonfire.OpenID.Web.ClientController do
               redirect_to(conn, url, type: :maybe_external)
 
             other ->
-              info(provider_config, "provider")
               error(other, "OpenID redirect URL could not be generated for provider: #{provider}")
+              flood(provider_config, "provider")
+
+              raise Bonfire.Fail, {:not_found, "Provider could not be reached"}
           end
         else
           # error or callback after coming back from remote 

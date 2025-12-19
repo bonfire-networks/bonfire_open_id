@@ -63,12 +63,13 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       "write:statuses"
     ]
 
-  def get_or_new(id_or_name, redirect_uri) do
+  # Overload to accept attrs for dynamic client creation (e.g., PKCE/public)
+  def get_or_new(id_or_name, redirect_uri, attrs \\ %{}) do
     id = id_or_name_to_id(id_or_name)
 
     case get(id, id_or_name, redirect_uri) |> debug("got") do
       nil ->
-        new(id, id_or_name, redirect_uri)
+        new(Map.merge(%{id: id, name: id_or_name, redirect_uris: [redirect_uri]}, attrs))
         |> debug("newed")
 
       client ->
@@ -200,6 +201,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
           end
       end
 
+    # set some defaults
     %{
       # OAuth client_id
       id: id,
@@ -243,7 +245,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # see OAuth 2.0 confidentiality (requires client secret for some flows)
       confidential: true,
       # require client_secret for revoking tokens?
-      public_revoke: false,
+      public_revoke: true,
       # activate-able client authentication methods
       token_endpoint_auth_methods: [
         "client_secret_basic",
@@ -282,7 +284,11 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   def register_dynamic_client(params) do
     # Validate required fields
-    with {:ok, validated_params} <- validate_registration_params(params) do
+    with {:ok, validated_params} <-
+           params
+           |> flood("input params")
+           |> validate_registration_params()
+           |> flood("validated params") do
       registration_access_token = generate_registration_access_token()
       client_id = generate_client_id()
 
