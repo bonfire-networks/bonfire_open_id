@@ -5,6 +5,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
   import Mox
 
   alias Boruta.Oauth.Error
+  alias Boruta.Openid.UserinfoResponse
 
   alias Bonfire.OpenID.Web.Openid.UserinfoController
 
@@ -16,11 +17,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
 
   describe "userinfo/2" do
     test "returns an error if unauthorized", %{conn: conn} do
-      error = %Error{
-        status: :bad_request,
-        error: :error,
-        error_description: "error_description"
-      }
+      error = %Error{status: :bad_request, error: :error, error_description: "error_description"}
 
       Boruta.OpenidMock
       |> expect(:userinfo, fn conn, module ->
@@ -44,7 +41,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
 
       Boruta.OpenidMock
       |> expect(:userinfo, fn conn, module ->
-        module.userinfo_fetched(conn, resource_owner_claims)
+        module.userinfo_fetched(conn, %UserinfoResponse{
+          userinfo: resource_owner_claims,
+          format: :json
+        })
       end)
 
       conn = UserinfoController.userinfo(conn, %{})
@@ -52,15 +52,19 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.UserinfoControllerTest do
       assert json_response(conn, 200) == resource_owner_claims
     end
 
+    # TODO
     # test "userinfo endpoint requires valid access token via conn", %{conn: conn} do
+
     #   # Try without authorization header
     #   conn = get(conn, "/openid/userinfo")
     #   assert conn.status == 401
 
     #   # Try with invalid token
-    #   conn = conn
-    #   |> put_req_header("authorization", "Bearer invalid_token")
-    #   |> get("/openid/userinfo")
+    #   conn =
+    #     conn
+    #     |> put_req_header("authorization", "Bearer invalid_token")
+    #     |> get("/openid/userinfo")
+
     #   assert conn.status == 401
     # end
   end

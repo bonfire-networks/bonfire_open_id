@@ -11,13 +11,11 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def token(%Plug.Conn{} = conn, _params) do
-    oauth_module().token(conn, __MODULE__)
+    conn |> oauth_module().token(__MODULE__)
   end
 
   @impl Boruta.Oauth.TokenApplication
   def token_success(conn, %TokenResponse{} = response) do
-    debug(response)
-
     conn
     |> put_resp_header("pragma", "no-cache")
     |> put_resp_header("cache-control", "no-store")
@@ -26,20 +24,13 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   end
 
   @impl Boruta.Oauth.TokenApplication
-  def token_error(
-        conn,
-        %Error{
-          status: status,
-          error: error_detail,
-          error_description: error_description
-        } = error
-      ) do
-    error(error)
-    debug(conn)
+  def token_error(conn, %Error{status: status, error: error, error_description: error_description}) do
+    error(error, inspect(error_description))
+    flood(conn)
 
     conn
     |> put_status(status)
     |> put_view(OauthView)
-    |> render("error.json", error: error_detail, error_description: error_description)
+    |> render("error.json", error: error, error_description: error_description)
   end
 end

@@ -226,7 +226,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # scopes that are authorized using this client
       # ...existing code...
       authorized_scopes: scopes_maps(),
-      # client supported grant types
+      # client supported grant types - NOTE: device not yet supported: https://github.com/malach-it/boruta_auth/issues/46
       supported_grant_types: [
         "client_credentials",
         "password",
@@ -238,12 +238,14 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       ],
       # PKCE enabled
       pkce: false,
-      # do not require client_secret for refreshing tokens
+      # require client_secret for refreshing tokens?
       public_refresh_token: false,
-      # do not require client_secret for revoking tokens
+      # see OAuth 2.0 confidentiality (requires client secret for some flows)
+      confidential: true,
+      # require client_secret for revoking tokens?
       public_revoke: false,
       # activate-able client authentication methods
-      token_endpont_auth_methods: [
+      token_endpoint_auth_methods: [
         "client_secret_basic",
         "client_secret_post",
         "client_secret_jwt",
@@ -253,7 +255,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
     |> Map.merge(params)
-    |> debug("map to create")
+    |> flood("map to create")
     # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
   end
@@ -464,31 +466,70 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   end
 
   defp validate_registration_params(params) do
-    # Validate redirect_uris
-    case params["redirect_uris"] do
-      uris when is_list(uris) and length(uris) > 0 ->
-        if Enum.all?(uris, &valid_uri?/1) do
-          {:ok, params}
-        else
-          {:error, :invalid_redirect_uri}
-        end
+    # Skip redirect_uri validation for device code flow
+    flood(params, "validating params")
+    grant_type = params["grant_type"]
+    application_type = params["application_type"] || "web"
 
-      _ ->
-        {:error, :invalid_redirect_uri}
+    if grant_type == "urn:ietf:params:oauth:grant-type:device_code" do
+      {:ok, params}
+    else
+      case params["redirect_uris"] do
+        uris when is_list(uris) and length(uris) > 0 ->
+          # TEMP workaround: Filter out native URIs (custom scheme, no host) to avoid Boruta validation error
+          # TODO: Open an issue/PR upstream to allow native redirect URIs per OIDC spec
+          filtered_uris =
+            Enum.filter(uris, fn uri ->
+              case URI.parse(uri) do
+                %URI{scheme: _, host: nil} ->
+                  false
+
+                %URI{scheme: nil, host: _} ->
+                  false
+
+                _ ->
+                  true
+              end
+            end)
+
+          if Enum.all?(filtered_uris, &valid_redirect_uri?(&1, application_type)) and
+               length(filtered_uris) > 0 do
+            # Pass only filtered URIs to params
+            {:ok, Map.put(params, "redirect_uris", filtered_uris)}
+          else
+            {:error, :invalid_redirect_uri}
+          end
+
+        _ ->
+          {:error, :invalid_redirect_uri}
+      end
     end
   end
 
-  defp valid_uri?(uri) when is_binary(uri) do
+  # Accepts http/https for web apps, and custom schemes for native apps (e.g., edu.kit.data.oidc-agent:/redirect)
+  defp valid_redirect_uri?(uri, application_type) when is_binary(uri) do
     case URI.parse(uri) do
-      %URI{scheme: scheme, host: host} when scheme in ["http", "https"] and is_binary(host) ->
-        true
+      %URI{scheme: scheme, host: host, path: path} ->
+        cond do
+          application_type == "web" and scheme in ["http", "https"] and is_binary(host) ->
+            true
+
+          # application_type == "native" and scheme not in ["http", "https"] and (is_binary(host) or is_binary(path)) ->
+          #   true
+          scheme not in ["http", "https"] and (is_binary(host) or is_binary(path)) ->
+            # Accept custom schemes for native apps even if application_type is not set
+            true
+
+          true ->
+            false
+        end
 
       _ ->
         false
     end
   end
 
-  defp valid_uri?(_), do: false
+  defp valid_redirect_uri?(_, _), do: false
 
   defp generate_client_id do
     SecureRandom.uuid()

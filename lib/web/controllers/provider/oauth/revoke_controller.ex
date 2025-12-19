@@ -10,13 +10,11 @@ defmodule Bonfire.OpenID.Web.Oauth.RevokeController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def revoke(%Plug.Conn{} = conn, _params) do
-    flood("oauth_revoke called")
-    oauth_module().revoke(conn, __MODULE__)
+    conn |> oauth_module().revoke(__MODULE__)
   end
 
   @impl Boruta.Oauth.RevokeApplication
   def revoke_success(%Plug.Conn{} = conn) do
-    flood("oauth_revoke succeeded")
     send_resp(conn, 200, "")
   end
 

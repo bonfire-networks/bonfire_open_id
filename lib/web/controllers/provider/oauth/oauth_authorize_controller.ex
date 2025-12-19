@@ -12,12 +12,16 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, _params) do
+    current_user = current_user(conn) || current_account(conn)
+    conn = store_user_return_to(conn)
+
     authorize_response(
       conn,
-      current_user(conn) || current_account(conn)
+      current_user
     )
   end
 
+  @doc "Callback called by Bonfire.UI.Common.redirect_to_previous_go when redirect back to /oauth/authorize after login. This extracts the query string and calls authorize/2 directly instead of redirecting back to this controller."
   def from_query_string(conn, query) do
     query_params =
       Plug.Conn.Query.decode(query)
@@ -27,27 +31,21 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     authorize(%{conn | query_params: query_params}, query_params)
   end
 
-  defp authorize_response(conn, %_{} = agent) do
-    %ResourceOwner{
-      sub: to_string(agent.id),
-      username: e(agent, :character, :username, nil) || e(agent, :email, :email_address, nil)
-    }
-    # |> debug()
-    |> oauth_module().authorize(
-      conn,
-      ...,
-      __MODULE__
-    )
-    |> debug()
+  defp authorize_response(conn, %_{} = current_user) do
+    with {:ok, %ResourceOwner{} = resource_owner} <- Bonfire.OpenID.get_user(current_user) do
+      conn
+      |> oauth_module().authorize(
+        resource_owner,
+        __MODULE__
+      )
+    else
+      e ->
+        err(e, "Could not build resource owner from current_user")
+    end
   end
 
-  defp authorize_response(conn, other) do
-    debug(other, "not yet signed in")
-    url = current_path(conn)
-
-    conn
-    |> store_go(url)
-    |> redirect_to_login(url)
+  defp authorize_response(conn, _params) do
+    redirect_to_login(conn)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -56,7 +54,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         %AuthorizeResponse{} = response
       ) do
     conn
-    # |> Plug.Conn.put_status(303) # to support redirect after a POST
+    # |> Plug.Conn.put_status(303) # TODO? to support redirect after a POST
     |> redirect_to(
       AuthorizeResponse.redirect_to_url(response)
       |> debug(),
@@ -69,6 +67,8 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         conn,
         %Error{status: :unauthorized, error: :invalid_client} = error
       ) do
+    error(error, "Invalid client error")
+
     authorize_error(
       conn,
       %{error | status: :bad_request}
@@ -79,7 +79,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         %Plug.Conn{} = conn,
         %Error{status: :unauthorized} = error
       ) do
-    error(error)
+    warn(error, "Redirecting to login for unauthorized error")
     redirect_to_login(conn)
   end
 
@@ -88,10 +88,10 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
         %Error{format: format} = error
       )
       when not is_nil(format) do
-    error(error)
+    error(error, "Redirecting to error")
 
-    redirect_to(
-      conn,
+    conn
+    |> redirect_to(
       Error.redirect_to_url(error),
       type: :maybe_external
     )
@@ -99,18 +99,14 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
   def authorize_error(
         conn,
-        %Error{
-          status: status,
-          error: error_detail,
-          error_description: error_description
-        } = error
+        %Error{status: status, error: error, error_description: error_description}
       ) do
-    error(error)
+    error(error, inspect(error_description))
 
     conn
     |> put_status(status)
     |> put_view(OauthView)
-    |> render("error.html", error: error_detail, error_description: error_description)
+    |> render("error.html", error: error, error_description: error_description)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -119,10 +115,9 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   @impl Boruta.Oauth.AuthorizeApplication
   def preauthorize_error(_conn, _response), do: :ok
 
-  defp store_go(conn, url \\ nil) do
-    # remove prompt and max_age params affecting redirections
-    put_session(
-      conn,
+  defp store_user_return_to(conn, url \\ nil) do
+    conn
+    |> put_session(
       :go,
       url || current_path(conn)
     )

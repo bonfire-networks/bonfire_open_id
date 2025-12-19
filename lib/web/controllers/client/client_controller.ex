@@ -8,8 +8,8 @@ defmodule Bonfire.OpenID.Web.ClientController do
   def create(conn, %{"provider" => provider} = params) do
     params = Map.drop(params, ["provider"])
 
-    with provider when is_atom(provider) <- maybe_to_atom(provider) do
-      if provider_config = Client.open_id_connect_providers()[provider] do
+    with provider when not is_nil(provider) <- maybe_to_atom(provider) |> flood("provider") do
+      if provider_config = ed(Client.open_id_connect_providers(), provider, nil) do
         #  redirect to authorization URL
         if params == %{} do
           # start flow: redirect to remote authorization URL
@@ -31,7 +31,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
           ) || with_open_id_connect(conn, provider, Map.new(provider_config), params)
         end
       else
-        if provider_config = Client.oauth2_providers()[provider] do
+        if provider_config = ed(Client.oauth2_providers(), provider, nil) do
           debug(provider_config)
           # start flow: redirect to remote authorization URL
           if params == %{} do
@@ -53,64 +53,89 @@ defmodule Bonfire.OpenID.Web.ClientController do
       end
     else
       other ->
-        error(other)
+        error(other, "Provider not found")
 
         raise Bonfire.Fail, {:not_found, "Provider #{inspect(provider)}"}
     end
   end
 
   def oauth_provider_url(provider, config \\ nil) do
-    config = config || Client.oauth2_providers()[provider]
+    with config when not is_nil(config) <- config || ed(Client.oauth2_providers(), provider, nil) do
+      params =
+        %{
+          # Required - indicates we want an authorization code
+          "response_type" => config[:response_type] || "code",
+          # Required - the client's ID
+          "client_id" => config[:client_id],
+          # "http://localhost:4001/openid_client/test_provider", # Required - must match registered URI
+          "redirect_uri" => config[:redirect_uri],
+          # Optional - space-separated list of requested permissions
+          "scope" => config[:scope],
+          # Recommended - random string to prevent CSRF
+          "state" => Bonfire.Common.Text.random_string()
+          # "prompt" => "consent"            # Optional - force showing the consent screen
+          # "code_challenge_method" => "S256" # Optional - PKCE hash method
+          # "code_challenge" => ?, # Optional - for PKCE
+        }
+        |> URI.encode_query()
 
-    params =
-      %{
-        # Required - indicates we want an authorization code
-        "response_type" => config[:response_type] || "code",
-        # Required - the client's ID
-        "client_id" => config[:client_id],
-        # "http://localhost:4001/openid_client/test_provider", # Required - must match registered URI
-        "redirect_uri" => config[:redirect_uri],
-        # Optional - space-separated list of requested permissions
-        "scope" => config[:scope],
-        # Recommended - random string to prevent CSRF
-        "state" => Bonfire.Common.Text.random_string()
-        # "prompt" => "consent"            # Optional - force showing the consent screen
-        # "code_challenge_method" => "S256" # Optional - PKCE hash method
-        # "code_challenge" => ?, # Optional - for PKCE
-      }
-      |> URI.encode_query()
+      "#{config[:authorize_uri]}?#{params}"
+    else
+      _ ->
+        flood(
+          Client.oauth2_providers(),
+          "OAuth2 provider config not found for #{inspect(provider)}"
+        )
 
-    "#{config[:authorize_uri]}?#{params}"
+        raise Bonfire.Fail, {:not_found, "OAuth2 provider not found"}
+    end
   end
 
   def openid_callback_url(provider) do
     "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}"
   end
 
-  def openid_provider_url(provider, config \\ nil) do
-    provider_config = Map.new(config || Client.open_id_connect_providers()[provider])
+  def openid_provider_url(provider, provider_config \\ nil) do
+    with provider_config when not is_nil(provider_config) <-
+           provider_config || ed(Client.open_id_connect_providers(), provider, nil) do
+      # Base parameters
+      base_params = %{
+        "state" => Bonfire.Common.Text.random_string(),
+        "nonce" => Bonfire.Common.Text.random_string()
+      }
 
-    # Base parameters
-    base_params = %{
-      "state" => Bonfire.Common.Text.random_string(),
-      "nonce" => Bonfire.Common.Text.random_string()
-    }
+      # Add PKCE parameters if present in config
+      additional_params =
+        case provider_config do
+          %{pkce: true, code_challenge: code_challenge, code_challenge_method: method} ->
+            Map.merge(base_params, %{
+              "code_challenge" => code_challenge,
+              "code_challenge_method" => method
+            })
 
-    # Add PKCE parameters if present in config
-    additional_params =
-      case provider_config do
-        %{pkce: true, code_challenge: code_challenge, code_challenge_method: method} ->
-          Map.merge(base_params, %{
-            "code_challenge" => code_challenge,
-            "code_challenge_method" => method
-          })
+          _ ->
+            base_params
+        end
 
-        _ ->
-          base_params
-      end
+      provider_config
+      |> OpenIDConnect.authorization_uri(openid_callback_url(provider), additional_params)
+    else
+      _ ->
+        flood(
+          Client.open_id_connect_providers(),
+          "OpenID provider config not found for #{inspect(provider)}"
+        )
 
-    provider_config
-    |> OpenIDConnect.authorization_uri(openid_callback_url(provider), additional_params)
+        raise Bonfire.Fail, {:not_found, "OpenID provider not found"}
+    end
+  end
+
+  defp user_info_body(userinfo_uri, access_token) do
+    if userinfo_uri do
+      Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}])
+    else
+      {:ok, %{body: "{}"}}
+    end
   end
 
   defp with_oauth2(
@@ -153,12 +178,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
               _ -> URI.decode_query(token_result)
             end)
            |> debug("token_data"),
-         {:ok, %{body: userinfo_body}} <-
-           (if userinfo_uri = config[:userinfo_uri] do
-              Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}])
-            else
-              {:ok, %{body: "{}"}}
-            end),
+         {:ok, %{body: userinfo_body}} <- user_info_body(config[:userinfo_uri], access_token),
          {:ok, userinfo} <- Jason.decode(userinfo_body) do
       process_external_auth(conn, provider, config, Enum.into(userinfo, token_data))
     else

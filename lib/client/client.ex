@@ -2,6 +2,7 @@ defmodule Bonfire.OpenID.Client do
   import Untangle
   use Arrows
   use Bonfire.Common.Localise
+  use Bonfire.Common.E
   alias Bonfire.Common.Utils
   alias Bonfire.Common.Types
 
@@ -32,7 +33,7 @@ defmodule Bonfire.OpenID.Client do
 
   def provider_config(provider) do
     with provider when is_atom(provider) <- Types.maybe_to_atom(provider) do
-      open_id_connect_providers()[provider] || oauth2_providers()[provider]
+      ed(open_id_connect_providers(), provider, nil) || ed(oauth2_providers(), provider, nil)
     end
   end
 

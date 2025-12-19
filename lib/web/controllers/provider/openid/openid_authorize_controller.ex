@@ -1,5 +1,6 @@
 defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   @behaviour Boruta.Oauth.AuthorizeApplication
+
   use Bonfire.UI.Common.Web, :controller
 
   alias Boruta.Oauth.AuthorizeResponse
@@ -11,36 +12,22 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, _params) do
-    go_after_url = go_after_url(conn)
-
-    conn =
-      conn
-      |> store_go(go_after_url)
-      |> put_unsigned_request()
-
-    resource_owner =
-      get_resource_owner(conn)
-      |> info("resource_owner")
+    conn = store_user_return_to(conn)
+    # |> put_unsigned_request()
 
     with {:unchanged, conn} <- prompt_redirection(conn),
+         resource_owner = get_resource_owner(conn),
          {:unchanged, conn} <- max_age_redirection(conn, resource_owner),
-         {:unchanged, conn} <-
-           login_redirection(conn, go_after_url) |> info("login_redirection?") do
-      conn
-      |> store_go(nil)
-      |> info("go_stored")
-      |> oauth_module().authorize(resource_owner, __MODULE__)
-      |> info("authorized?")
+         {:unchanged, conn} <- login_redirection(conn) |> flood("login_redirection?") do
+      oauth_module().authorize(conn, resource_owner, __MODULE__)
     end
   end
 
-  # def authorize_with_params(%Plug.Conn{} = conn, params) do
-  #   authorize(%{conn | query_params: params}, params)
-  # end
-
+  @doc "Callback called by Bonfire.UI.Common.redirect_to_previous_go when redirect back to /openid/authorize after login. This extracts the query string and calls authorize/2 directly instead of redirecting back to this controller."
   def from_query_string(conn, query) do
     query_params =
       Plug.Conn.Query.decode(query)
+      |> flood("from_query_string query_params")
       |> Map.update("response_type", "code id_token token", fn existing_value ->
         # FIXME: temp workaround for this error: Invalid response_type param, may be on of `code` for Authorization Code request, `code id_token`, `code token`, `code id_token token` for Hybrid requests, or `token`, `id_token token` for Implicit requests
         case existing_value do
@@ -49,10 +36,13 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
           _ -> "code id_token token"
         end
       end)
-      |> info()
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
+      |> add_unsigned_request()
+      |> flood("from_query_string transformed query_params")
 
-    authorize(%{conn | query_params: query_params}, query_params)
+    conn
+    |> Map.put(:query_params, query_params)
+    |> authorize(query_params)
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
@@ -68,6 +58,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %Plug.Conn{} = conn,
         %Error{status: :unauthorized, error: :login_required} = error
       ) do
+    warn("Unauthorized, redirecting")
+    # TODO? redirect to login instead of error?
     redirect_to(conn, Error.redirect_to_url(error), type: :maybe_external)
   end
 
@@ -75,6 +67,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %Plug.Conn{} = conn,
         %Error{status: :unauthorized, error: :invalid_resource_owner}
       ) do
+    warn("Invalid resource owner, redirecting to login")
     redirect_to_login(conn)
   end
 
@@ -85,22 +78,20 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         } = error
       )
       when not is_nil(format) do
+    warn(error, "Redirecting to error")
     redirect_to(conn, Error.redirect_to_url(error), type: :maybe_external)
   end
 
   def authorize_error(
         conn,
-        %Error{
-          status: status,
-          error: error,
-          error_description: error_description
-        }
+        %Error{status: status, error: error, error_description: error_description}
       ) do
     if error == :invalid_client do
-      debug(repo().all(Boruta.Ecto.Client), "known clients")
+      flood(repo().all(Boruta.Ecto.Client), "known clients")
     end
 
     error(error, inspect(error_description))
+    flood(conn)
 
     conn
     |> put_status(status)
@@ -108,18 +99,29 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     |> render("error.html", error: error, error_description: error_description)
   end
 
-  defp put_unsigned_request(%Plug.Conn{query_params: query_params} = conn) do
+  # what was this for?
+  defp add_unsigned_request(query_params) do
     unsigned_request_params =
-      with request <- Map.get(query_params, "request", ""),
+      with request when is_binary(request) <- Map.get(query_params, "request"),
            {:ok, params} <- Joken.peek_claims(request) do
         params
       else
         _ -> %{}
       end
 
-    query_params = Map.merge(query_params, unsigned_request_params)
+    Map.merge(query_params, unsigned_request_params)
+  end
 
-    %{conn | query_params: query_params}
+  defp store_user_return_to(conn, url \\ nil) do
+    # remove prompt and max_age params affecting redirections
+    conn
+    |> put_session(
+      :go,
+      url ||
+        current_path(conn)
+        |> String.replace(~r/prompt=(login|none)/, "")
+        |> String.replace(~r/max_age=(\d+)/, "")
+    )
   end
 
   defp prompt_redirection(%Plug.Conn{query_params: %{"prompt" => "login"}} = conn) do
@@ -141,14 +143,14 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     end
   end
 
-  defp max_age_redirection(%Plug.Conn{} = conn, _resource_owner),
-    do: {:unchanged, conn}
+  defp max_age_redirection(%Plug.Conn{} = conn, _resource_owner), do: {:unchanged, conn}
 
   defp login_expired?(%ResourceOwner{last_login_at: last_login_at}, max_age)
        when not is_nil(last_login_at) do
-    now = DateTime.to_unix(DateTime.utc_now())
+    now = DateTime.utc_now() |> DateTime.to_unix()
 
-    with {max_age, _} <- Integer.parse("#{max_age}"),
+    with "" <> max_age <- max_age,
+         {max_age, _} <- Integer.parse(max_age),
          true <- now - DateTime.to_unix(last_login_at) >= max_age do
       true
     else
@@ -156,49 +158,41 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     end
   end
 
-  defp login_expired?(_, _) do
-    # FIXME
+  defp login_expired?(resource_owner, _) do
+    warn(resource_owner, "Could not determine last_login_at")
+    # FIXME?
     false
   end
 
-  defp login_redirection(conn, go_after_url \\ nil)
-
-  defp login_redirection(%Plug.Conn{assigns: %{current_user: _current_user}} = conn, _) do
+  defp login_redirection(%Plug.Conn{assigns: %{current_user: _current_user}} = conn) do
     {:unchanged, conn}
   end
 
-  defp login_redirection(%Plug.Conn{query_params: %{"prompt" => "none"}} = conn, _) do
+  defp login_redirection(%Plug.Conn{query_params: %{"prompt" => "none"}} = conn) do
     {:unchanged, conn}
   end
 
-  defp login_redirection(%Plug.Conn{} = conn, go_after_url) do
-    redirect_to_login(conn, go_after_url)
+  defp login_redirection(%Plug.Conn{} = conn) do
+    redirect_to_login(conn)
   end
 
   defp get_resource_owner(conn) do
     case Bonfire.OpenID.get_user(conn) do
-      {:ok, %ResourceOwner{} = ro} ->
-        ro
+      {:ok, %ResourceOwner{} = resource_owner} ->
+        resource_owner
 
-      _ ->
-        %ResourceOwner{sub: nil}
+      e ->
+        error(e, "Could not find current user")
+
+        # %ResourceOwner{sub: nil}
+
+        # current_user ->
+        #   %ResourceOwner{
+        #     sub: to_string(current_user.id),
+        #     username: e(agent, :character, :username, nil) || e(agent, :email, :email_address, nil),
+        #     # last_login_at: current_user.last_login_at
+        #   }
     end
-  end
-
-  defp go_after_url(conn) do
-    # remove prompt and max_age params affecting redirections
-    current_path(conn)
-    |> String.replace(~r/prompt=(login|none)/, "")
-    |> String.replace(~r/max_age=(\d+)/, "")
-  end
-
-  defp store_go(conn, url) do
-    # remove prompt and max_age params affecting redirections
-    put_session(
-      conn,
-      :go,
-      url
-    )
   end
 
   def redirect_to_login(conn, go_after_url \\ nil) do
@@ -206,7 +200,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     # NOTE: after successfully logged in, it should redirect to `get_session(conn, :go)`
     redirect_to(
       conn,
-      "#{Bonfire.Common.URIs.path(:login)}?#{URI.encode_query(%{"go" => go_after_url})}"
+      "#{Bonfire.Common.URIs.path(:login)}?#{URI.encode_query(%{"go" => go_after_url || current_path(conn)})}"
     )
   end
 

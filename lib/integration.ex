@@ -50,8 +50,9 @@ defmodule Bonfire.OpenID do
     {:ok,
      %ResourceOwner{
        sub: id,
-       username: e(current_user, :character, :username, nil) || e(current_user, :email, nil),
        # TODO include email, etc?
+       username: e(current_user, :character, :username, nil) || e(current_user, :email, nil),
+       # TODO: are we recording last seen on login and/or when the user was last active?
        last_login_at:
          if(Types.is_uid?(id),
            do: Bonfire.Social.Seen.last_date(id, current_account_id(current_user))
@@ -75,16 +76,29 @@ defmodule Bonfire.OpenID do
     end
   end
 
+  @impl Boruta.Oauth.ResourceOwners
+  def authorized_scopes(%ResourceOwner{} = _resource_owner) do
+    # TODO: customize per user based on instance roles/boundaries
+    Bonfire.OpenID.Provider.ClientApps.scopes_structs()
+  end
 
   @impl Boruta.Oauth.ResourceOwners
-    def authorized_scopes(%ResourceOwner{} = _resource_owner) do
-      # TODO: customize per user based on instance roles/boundaries
-      Bonfire.OpenID.Provider.ClientApps.scopes_structs()
-    end
+  def claims(%ResourceOwner{} = resource_owner, scope) do
+    # last_login =
+    #   case resource_owner.last_login_at do
+    #     %DateTime{} = dt -> DateTime.to_iso8601(dt)
+    #     %NaiveDateTime{} = ndt -> NaiveDateTime.to_iso8601(ndt)
+    #     val when is_binary(val) -> val
+    #     _ -> nil
+    #   end
 
-    # TODO? https://hexdocs.pm/boruta/3.0.0-beta.4/Boruta.Oauth.ResourceOwners.html#c:claims/2
-      # @impl Boruta.Oauth.ResourceOwners
-  # def claims(_resource_owner, _scope), do: %{}
-
-
+    # TODO: Add more claims?
+    %{
+      "sub" => resource_owner.sub,
+      "name" => resource_owner.username
+      # "last_login_at" => last_login
+    }
+    # TODO: FIXME: claims should be filtered by scope
+    |> Map.merge(resource_owner.extra_claims || %{})
+  end
 end
