@@ -8,7 +8,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   defdelegate list_scopes, to: Boruta.Ecto.Admin
   defdelegate list_active_tokens, to: Boruta.Ecto.Admin
 
-  # TODO: put in config 
+  # TODO: put in config
   def default_scopes,
     do: [
       "openid",
@@ -64,12 +64,13 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     ]
 
   # Overload to accept attrs for dynamic client creation (e.g., PKCE/public)
-  def get_or_new(id_or_name, redirect_uri, attrs \\ %{}) do
+  def get_or_new(id_or_name, redirect_uris, attrs \\ %{}) do
+    redirect_uris = List.wrap(redirect_uris) |> List.flatten()
     id = id_or_name_to_id(id_or_name)
 
-    case get(id, id_or_name, redirect_uri) |> debug("got") do
+    case get(id, id_or_name, redirect_uris) |> debug("got") do
       nil ->
-        new(Map.merge(%{id: id, name: id_or_name, redirect_uris: [redirect_uri]}, attrs))
+        new(Map.merge(%{id: id, name: id_or_name, redirect_uris: redirect_uris}, attrs))
         |> debug("newed")
 
       client ->
