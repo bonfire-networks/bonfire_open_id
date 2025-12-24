@@ -202,12 +202,11 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
           end
       end
 
+
     # set some defaults
     %{
       # OAuth client_id
       id: id,
-      # OAuth client_secret
-      secret: SecureRandom.hex(64),
       # Display name
       name: Map.get(params, :name) || params[:id] || "Client app",
       # one day
@@ -258,6 +257,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
     |> Map.merge(params)
+    # OAuth client_secret
+    |> Map.put_new_lazy(:secret, & SecureRandom.hex(64))
     |> flood("map to create")
     # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
