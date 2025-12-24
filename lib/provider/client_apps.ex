@@ -70,7 +70,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     case get(id, id_or_name, redirect_uris) |> debug("got") do
       nil ->
         redirect_uris = List.wrap(redirect_uris)
-    
+
         new(Map.merge(%{id: id, name: id_or_name, redirect_uris: redirect_uris}, attrs))
         |> debug("newed")
 
@@ -210,7 +210,6 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
           end
       end
 
-
     # set some defaults
     %{
       # OAuth client_id
@@ -266,7 +265,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     }
     |> Map.merge(params)
     # OAuth client_secret
-    |> Map.put_new_lazy(:secret, & SecureRandom.hex(64))
+    |> Map.put_new_lazy(:secret, fn -> SecureRandom.hex(64) end)
     |> flood("map to create")
     # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
