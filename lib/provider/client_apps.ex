@@ -65,11 +65,12 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   # Overload to accept attrs for dynamic client creation (e.g., PKCE/public)
   def get_or_new(id_or_name, redirect_uris, attrs \\ %{}) do
-    redirect_uris = List.wrap(redirect_uris) |> List.flatten()
     id = id_or_name_to_id(id_or_name)
 
     case get(id, id_or_name, redirect_uris) |> debug("got") do
       nil ->
+        redirect_uris = List.wrap(redirect_uris)
+    
         new(Map.merge(%{id: id, name: id_or_name, redirect_uris: redirect_uris}, attrs))
         |> debug("newed")
 
@@ -139,6 +140,13 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   def get(nil, name, [redirect_uri]) when is_binary(redirect_uri) do
     get(nil, name, redirect_uri)
+  end
+
+  def get(nil, name, redirect_uris) when is_list(redirect_uris) do
+    # TODO: compare the arrays regardless of order, checking if all given uris are in the client's redirect_uris (even if it has extra ones configured)?
+    repo().one(
+      from c in Boruta.Ecto.Client, where: ^name == c.name and ^redirect_uris == c.redirect_uris
+    )
   end
 
   def get(id, _name, _redirect_uri) do
