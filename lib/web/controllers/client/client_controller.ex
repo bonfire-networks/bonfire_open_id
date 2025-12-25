@@ -8,7 +8,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
   def create(conn, %{"provider" => provider} = params) do
     params = Map.drop(params, ["provider"])
 
-    with provider when not is_nil(provider) <- maybe_to_atom(provider) |> flood("provider") do
+    with provider when not is_nil(provider) <- maybe_to_atom(provider) |> debug("provider") do
       if provider_config = ed(Client.open_id_connect_providers(), provider, nil) do
         #  redirect to authorization URL
         if params == %{} do
@@ -19,7 +19,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
 
             other ->
               error(other, "OpenID redirect URL could not be generated for provider: #{provider}")
-              flood(provider_config, "provider")
+              debug(provider_config, "provider")
 
               raise Bonfire.Fail, {:not_found, "Provider could not be reached"}
           end
@@ -84,7 +84,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
       "#{config[:authorize_uri]}?#{params}"
     else
       _ ->
-        flood(
+        debug(
           Client.oauth2_providers(),
           "OAuth2 provider config not found for #{inspect(provider)}"
         )
@@ -123,7 +123,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
       |> OpenIDConnect.authorization_uri(openid_callback_url(provider), additional_params)
     else
       _ ->
-        flood(
+        debug(
           Client.open_id_connect_providers(),
           "OpenID provider config not found for #{inspect(provider)}"
         )

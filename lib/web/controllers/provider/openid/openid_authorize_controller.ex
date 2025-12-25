@@ -18,7 +18,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     with {:unchanged, conn} <- prompt_redirection(conn),
          resource_owner = get_resource_owner(conn),
          {:unchanged, conn} <- max_age_redirection(conn, resource_owner),
-         {:unchanged, conn} <- login_redirection(conn) |> flood("login_redirection?") do
+         {:unchanged, conn} <- login_redirection(conn) |> debug("login_redirection?") do
       oauth_module().authorize(conn, resource_owner, __MODULE__)
     end
   end
@@ -27,7 +27,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   def from_query_string(conn, query) do
     query_params =
       Plug.Conn.Query.decode(query)
-      |> flood("from_query_string query_params")
+      |> debug("from_query_string query_params")
       |> Map.update("response_type", "code id_token token", fn existing_value ->
         # FIXME: temp workaround for this error: Invalid response_type param, may be on of `code` for Authorization Code request, `code id_token`, `code token`, `code id_token token` for Hybrid requests, or `token`, `id_token token` for Implicit requests
         case existing_value do
@@ -38,7 +38,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
       end)
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
       |> add_unsigned_request()
-      |> flood("from_query_string transformed query_params")
+      |> debug("from_query_string transformed query_params")
 
     conn
     |> Map.put(:query_params, query_params)
@@ -87,11 +87,11 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %Error{status: status, error: error, error_description: error_description}
       ) do
     if error == :invalid_client do
-      flood(repo().all(Boruta.Ecto.Client), "known clients")
+      debug(repo().all(Boruta.Ecto.Client), "known clients")
     end
 
     error(error, inspect(error_description))
-    flood(conn)
+    debug(conn)
 
     conn
     |> put_status(status)

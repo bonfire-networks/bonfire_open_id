@@ -37,7 +37,7 @@ defmodule Bonfire.OpenID.OAuthImplicitDanceTest do
 
       fragment_params = extract_fragment_params(login_response)
 
-      flood(fragment_params, "fragment_params")
+      debug(fragment_params, "fragment_params")
       access_token = fragment_params["access_token"]
       assert access_token, "Should receive access token in redirect fragment"
 

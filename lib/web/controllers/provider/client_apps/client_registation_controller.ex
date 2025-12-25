@@ -28,7 +28,7 @@ defmodule Bonfire.OpenID.Web.Openid.ClientRegistrationController do
         })
 
       {:error, reason} ->
-        flood(reason, "Client registration failed")
+        debug(reason, "Client registration failed")
 
         conn
         |> put_status(:bad_request)

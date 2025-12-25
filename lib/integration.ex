@@ -25,7 +25,7 @@ defmodule Bonfire.OpenID do
       Keyword.has_key?(opts, :username) -> get_user(opts[:username])
       true -> err(opts, "Invalid options to get user")
     end
-    |> flood("get_by with opts #{inspect(opts)}")
+    |> debug("get_by with opts #{inspect(opts)}")
   end
 
   def get_user(id_or_username) when is_binary(id_or_username) do
@@ -43,7 +43,7 @@ defmodule Bonfire.OpenID do
       %{} = user -> get_user(user)
       _ -> error(conn, "User not found")
     end
-    |> flood("get_user with conn")
+    |> debug("get_user with conn")
   end
 
   def get_user(%{id: id} = current_user) do

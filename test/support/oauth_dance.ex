@@ -24,7 +24,7 @@ defmodule Bonfire.OpenID.OAuthDance do
         # OAuth scopes, no "openid"
         supported_scopes: ["identity", "data:public", "read", "write"]
       })
-      |> flood("client created?")
+      |> debug("client created?")
       |> from_ok()
 
     %{
@@ -116,7 +116,7 @@ defmodule Bonfire.OpenID.OAuthDance do
 
     query_params =
       if query_params == %{} do
-        flood(login_response.headers["location"], "query_params empty, trying with fragment")
+        debug(login_response.headers["location"], "query_params empty, trying with fragment")
         # FIXME? not sure if this workaround is spec-compliant
         extract_fragment_params(login_response)
       end || query_params
@@ -350,7 +350,7 @@ defmodule Bonfire.OpenID.OAuthDance do
             claims
 
           other ->
-            flood(other, "Failed to peek JWT payload")
+            debug(other, "Failed to peek JWT payload")
             err("Could not decode JWT userinfo response")
         end
     end

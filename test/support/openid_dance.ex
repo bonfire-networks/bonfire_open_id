@@ -24,7 +24,7 @@ defmodule Bonfire.OpenID.OIDCDance do
                redirect_uris: [redirect_uri],
                supported_scopes: ["openid", "profile", "email", "identity", "data:public"]
              })
-             |> flood("client created")
+             |> debug("client created")
              |> from_ok()
 
     %{
@@ -154,7 +154,7 @@ defmodule Bonfire.OpenID.OIDCDance do
     access_token = fragment_params["access_token"]
     id_token = fragment_params["id_token"]
 
-    flood(fragment_params, "fragment_params")
+    debug(fragment_params, "fragment_params")
     assert access_token, "Should receive access token in redirect fragment"
     assert id_token, "Should receive ID token in redirect fragment"
 
@@ -673,7 +673,7 @@ defmodule Bonfire.OpenID.OIDCDance do
         "go" => go_url,
         "_csrf_token" => csrf_token
       }
-      |> flood("login form data")
+      |> debug("login form data")
 
     {:ok, login_response} =
       Req.post(req,
@@ -681,7 +681,7 @@ defmodule Bonfire.OpenID.OIDCDance do
         form: form_data,
         redirect: false
       )
-      |> flood("Performed login form submission")
+      |> debug("Performed login form submission")
 
     assert login_response.status == 303,
            debug(login_response, "login_response") && "Should redirect after successful login"
@@ -744,7 +744,7 @@ defmodule Bonfire.OpenID.OIDCDance do
             claims
 
           other ->
-            flood(other, "Failed to peek JWT payload")
+            debug(other, "Failed to peek JWT payload")
             err("Could not decode JWT userinfo response")
         end
     end

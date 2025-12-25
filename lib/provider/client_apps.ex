@@ -266,7 +266,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     |> Map.merge(params)
     # OAuth client_secret
     |> Map.put_new_lazy(:secret, fn -> SecureRandom.hex(64) end)
-    |> flood("map to create")
+    |> debug("map to create")
     # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
   end
@@ -295,9 +295,9 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     # Validate required fields
     with {:ok, validated_params} <-
            params
-           |> flood("input params")
+           |> debug("input params")
            |> validate_registration_params()
-           |> flood("validated params") do
+           |> debug("validated params") do
       registration_access_token = generate_registration_access_token()
       client_id = generate_client_id()
 
@@ -482,7 +482,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   defp validate_registration_params(params) do
     # Skip redirect_uri validation for device code flow
-    flood(params, "validating params")
+    debug(params, "validating params")
     grant_type = params["grant_type"]
     application_type = params["application_type"] || "web"
 
