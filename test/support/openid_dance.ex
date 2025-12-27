@@ -993,28 +993,29 @@ defmodule Bonfire.OpenID.OIDCDance do
     # Extract JWT header to get kid
     [header_b64, payload_b64, signature_b64] =
       String.split(jwt, ".")
-      |> debug("Splitting JWT into parts")
+      |> flood("Splitting JWT into parts")
 
     header =
       header_b64
       |> add_base64_padding()
       |> Base.decode64!()
       |> Jason.decode!()
+      |> flood("Decoded JWT header")
 
     kid = header["kid"]
 
     # Try to find matching key
     case Enum.find(jwks_keys, &(&1["kid"] == kid)) do
       nil when kid ->
-        debug(kid, "JWKS key ID not found in keys, trying all available keys")
+        flood(kid, "JWKS key ID not found in keys, trying all available keys")
         verify_with_all_keys(jwt, jwks_keys, [])
 
       nil ->
-        debug("No kid in JWT header, trying all available keys")
+        flood("No kid in JWT header, trying all available keys")
         verify_with_all_keys(jwt, jwks_keys, [])
 
       matching_key ->
-        debug(kid, "Found matching JWKS key, verifying signature")
+        flood(kid, "Found matching JWKS key, verifying signature")
         verify_jwt_with_key(jwt, matching_key, [kid])
     end
   end
@@ -1044,15 +1045,15 @@ defmodule Bonfire.OpenID.OIDCDance do
         {true, jwt_struct, _} ->
           # Signature valid, extract claims
           jwt_struct.fields
-          |> debug("JWT signature verified successfully")
+          |> flood("JWT signature verified successfully")
 
         {false, _jwt_struct, _} ->
-          # Signature invalid with this key
+          flood("Signature invalid with this key")
           {:error, {:signature_invalid, attempted_kids}}
       end
     rescue
       e ->
-        debug(e, "Error verifying JWT with key")
+        flood(e, "Error verifying JWT with key")
         {:error, {:verification_failed, attempted_kids}}
     end
   end
@@ -1075,11 +1076,12 @@ defmodule Bonfire.OpenID.OIDCDance do
     case verify_jwt_with_key(jwt, key, [kid | attempted_kids]) do
       {:error, _reason} ->
         # This key didn't work, try next one
-        debug(kid, "JWT signature verification failed with this key, trying next")
+        flood(kid, "JWT signature verification failed with this key, trying next")
         verify_with_all_keys(jwt, remaining_keys, [kid | attempted_kids])
 
       claims when is_map(claims) ->
         # Success! Return claims
+        flood(kid, "JWT signature verification worked with this key")
         claims
     end
   end

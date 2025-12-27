@@ -1,4 +1,6 @@
 defmodule Bonfire.OpenID.Provider do
+  def alg_supported, do: ["RS256", "RS512"]
+
   def openid_configuration_data do
     base_url = Bonfire.Common.URIs.base_url()
 
@@ -8,9 +10,7 @@ defmodule Bonfire.OpenID.Provider do
       "issuer" => "#{base_url}",
       "jwks_uri" => "#{base_url}/openid/jwks",
       "registration_endpoint" => "#{base_url}/openid/register",
-      "id_token_signing_alg_values_supported" => [
-        "RS512"
-      ],
+      "id_token_signing_alg_values_supported" => alg_supported(),
       "response_types_supported" => [
         "client_credentials",
         "password",
@@ -47,7 +47,7 @@ defmodule Bonfire.OpenID.Provider do
       "scopes_supported" => Bonfire.OpenID.Provider.ClientApps.default_scopes(),
       # "token_endpoint_auth_methods_supported"=>
       #   ["client_secret_basic", "private_key_jwt"],
-      "token_endpoint_auth_signing_alg_values_supported" => ["RS256", "RS512"],
+      "token_endpoint_auth_signing_alg_values_supported" => alg_supported(),
       "response_types_supported" => [
         "client_credentials",
         "password",
