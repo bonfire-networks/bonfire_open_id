@@ -1001,22 +1001,48 @@ defmodule Bonfire.OpenID.OIDCDance do
       |> Base.decode64!()
       |> Jason.decode!()
       |> flood("Decoded JWT header")
+    
+    Enum.map(jwks_keys, & &1["kid"])
+    |> flood("Available JWKS kids")
+
+    Enum.map(jwks_keys, & &1["x5t"])
+    |> flood("Available JWKS x5t")
+
+    Enum.map(jwks_keys, & &1["x5t#S256"])
+    |> flood("Available JWKS x5t#S256")
 
     kid = header["kid"]
 
-    # Try to find matching key
-    case Enum.find(jwks_keys, &(&1["kid"] == kid)) do
-      nil when kid ->
-        flood(kid, "JWKS key ID not found in keys, trying all available keys")
+    # Normalize helper
+    normalize = fn
+      nil -> nil
+      val when is_binary(val) -> val |> String.trim() |> String.trim_leading("\"") |> String.trim_trailing("\"")
+    end
+
+    # Try exact kid match (normalized), then x5t/x5t#S256, then fallback to trying all keys
+    matching_key =
+      jwks_keys
+      |> Enum.find(fn k ->
+        nk = normalize.(k["kid"])
+        nk && nk == normalize.(kid)
+      end) ||
+      jwks_keys |> Enum.find(fn k -> 
+        x5 = k["x5t"] || k["x5t#S256"]
+        normalize.(x5) && normalize.(x5) == normalize.(kid)
+      end)
+
+    case matching_key do
+      nil when is_nil(kid) ->
+        flood("No kid in JWT header (or normalized empty), trying all available keys")
         verify_with_all_keys(jwt, jwks_keys, [])
 
       nil ->
-        flood("No kid in JWT header, trying all available keys")
+        flood(kid, "JWT kid present but no direct match in JWKS; trying all available keys")
         verify_with_all_keys(jwt, jwks_keys, [])
 
       matching_key ->
-        flood(kid, "Found matching JWKS key, verifying signature")
-        verify_jwt_with_key(jwt, matching_key, [kid])
+        flood(matching_key["kid"] || "matched_via_x5t", "Found matching JWKS key, verifying signature")
+        verify_jwt_with_key(jwt, matching_key, [matching_key["kid"] || kid])
     end
   end
 
