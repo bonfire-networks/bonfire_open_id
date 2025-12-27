@@ -16,11 +16,20 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
 
   @impl Boruta.Openid.UserinfoApplication
   def userinfo_fetched(conn, userinfo_response) do
-    conn
-    |> put_view(OpenidView)
-    # TODO: add email address, username, etc?
-    |> put_resp_header("content-type", UserinfoResponse.content_type(userinfo_response))
-    |> render("userinfo.json", response: userinfo_response)
+    cond do
+      userinfo_response.format == :jwt ->
+        # Send raw JWT with correct content-type, no JSON encoding
+        conn
+        |> put_resp_content_type("application/jwt")
+        |> send_resp(200, userinfo_response.jwt)
+
+      true ->
+        # Fall back to rendering for other formats (e.g., plain JSON)
+        conn
+        |> put_view(OpenidView)
+        |> put_resp_header("content-type", UserinfoResponse.content_type(userinfo_response))
+        |> render("userinfo.json", response: userinfo_response)
+    end
   end
 
   @impl Boruta.Openid.UserinfoApplication
@@ -30,7 +39,10 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
       "www-authenticate",
       "error=\"#{error.error}\", error_description=\"#{error.error_description}\""
     )
-    |> send_resp(:unauthorized, "Could not authenticate or find userinfo")
+    |> send_resp(
+      :unauthorized,
+      error.error_description || "Could not authenticate or find userinfo"
+    )
   end
 
   def openid_discovery(conn, _) do

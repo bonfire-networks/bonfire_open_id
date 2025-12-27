@@ -340,6 +340,7 @@ defmodule Bonfire.OpenID.OAuthDance do
     case contents do
       %{} = map ->
         map
+        |> debug("userinfo response is already a map")
 
       jwt when is_binary(jwt) ->
         # Decode JWT using JOSE
@@ -348,6 +349,7 @@ defmodule Bonfire.OpenID.OAuthDance do
             fields: claims
           } ->
             claims
+            |> debug("userinfo JWT decoded to claims")
 
           other ->
             debug(other, "Failed to peek JWT payload")

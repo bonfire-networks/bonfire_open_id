@@ -734,6 +734,7 @@ defmodule Bonfire.OpenID.OIDCDance do
     case contents do
       %{} = map ->
         map
+        |> debug("userinfo response is already a map")
 
       jwt when is_binary(jwt) ->
         # Decode JWT using JOSE
@@ -742,6 +743,7 @@ defmodule Bonfire.OpenID.OIDCDance do
             fields: claims
           } ->
             claims
+            |> debug("userinfo JWT decoded to claims")
 
           other ->
             debug(other, "Failed to peek JWT payload")
@@ -790,5 +792,449 @@ defmodule Bonfire.OpenID.OIDCDance do
         uri -> debug("Server supports #{endpoint} at: #{uri}")
       end
     end
+  end
+
+  @doc """
+  Fetches JWKS endpoint and validates response format and key structure.
+
+  Verifies:
+  - Endpoint returns 200 status
+  - Response contains "keys" array
+  - Each key has required JWK fields (kid, kty, n, e for RSA)
+  - Keys are decodable
+  """
+  def verify_jwks_endpoint(main_instance) do
+    {:ok, jwks_response} = Req.get("#{main_instance}/openid/jwks")
+
+    assert jwks_response.status == 200,
+           "JWKS endpoint should return 200"
+
+    assert %{"keys" => keys} = jwks_response.body,
+           "JWKS response should contain 'keys' array"
+
+    assert is_list(keys) and length(keys) > 0,
+           "Keys should be a non-empty array"
+
+    # Validate each key
+    Enum.each(keys, &verify_jwk_key_format/1)
+
+    debug(keys, "JWKS keys verified")
+  end
+
+  @doc """
+  Validates a single JWK key has required fields per OpenID Connect spec.
+
+  For RSA keys (kty: RSA), requires: kid, kty, n, e
+  """
+  def verify_jwk_key_format(key) do
+    assert is_map(key), "JWK key should be a map"
+    assert key["kid"], "JWK key should have 'kid' (Key ID)"
+    assert key["kty"], "JWK key should have 'kty' (Key Type)"
+
+    case key["kty"] do
+      "RSA" ->
+        assert key["n"], "RSA key should have 'n' (modulus)"
+        assert key["e"], "RSA key should have 'e' (exponent)"
+
+      "EC" ->
+        assert key["crv"], "EC key should have 'crv' (curve)"
+        assert key["x"], "EC key should have 'x' coordinate"
+        assert key["y"], "EC key should have 'y' coordinate"
+
+      other ->
+        debug(other, "Unsupported key type")
+    end
+
+    debug(key["kid"], "JWK key format verified")
+  end
+
+  @doc """
+  Fetches and validates Userinfo endpoint response.
+
+  Verifies:
+  - Endpoint returns 200 with Bearer token
+  - Response contains 'sub' claim (required by spec)
+  - If response is JWT, verifies signature using JWKS keys
+  - Returns decoded claims map
+  """
+  def verify_userinfo_endpoint_with_keys(main_instance, access_token, jwks_keys) do
+    {:ok, userinfo_response} =
+      Req.get(
+        "#{main_instance}/openid/userinfo",
+        headers: [{"authorization", "Bearer #{access_token}"}]
+      )
+
+    assert userinfo_response.status == 200,
+           "Userinfo endpoint should return 200 with valid token"
+
+    userinfo_body = userinfo_response.body
+
+    # Check if response is a JWT string or already-decoded map/JSON
+    userinfo =
+      cond do
+        is_map(userinfo_body) ->
+          # Already decoded JSON (Req decoded it for us)
+          userinfo_body
+
+        is_binary(userinfo_body) and is_jwt?(userinfo_body) and is_list(jwks_keys) ->
+          # JWT string with keys available - verify signature
+          verify_userinfo_jwt_signature(userinfo_body, jwks_keys)
+
+        is_binary(userinfo_body) and is_jwt?(userinfo_body) ->
+          # JWT string but no keys - just decode without verification
+          warn("Userinfo is JWT but no JWKS keys provided for signature verification")
+          map_or_decode_jwt(userinfo_body)
+
+        is_binary(userinfo_body) ->
+          # Plain JSON string - decode it
+          Jason.decode!(userinfo_body)
+
+        true ->
+          userinfo_body
+      end
+
+    assert is_map(userinfo),
+           "Userinfo response should be a map (JSON or decoded JWT)"
+
+    assert userinfo["sub"],
+           "Userinfo must contain 'sub' claim per OpenID Connect spec"
+
+    debug(userinfo, "Userinfo endpoint verified")
+    userinfo
+  end
+
+  @doc """
+  Verifies JWT signature of userinfo response using JWKS keys.
+
+  Returns decoded claims if signature is valid, or fails with assertion error.
+  """
+  def verify_userinfo_jwt_signature(userinfo_jwt, jwks_keys) do
+    debug("Userinfo is JWT format, verifying signature with JWKS keys")
+
+    userinfo_claims = verify_jwt_signature(userinfo_jwt, jwks_keys)
+
+    assert is_map(userinfo_claims),
+           "Userinfo JWT signature verification should return claims map"
+
+    debug(userinfo_claims, "Userinfo JWT signature verified successfully")
+    userinfo_claims
+  end
+
+  @doc """
+  Checks if a value is a JWT string (has 3 dot-separated parts).
+
+  Returns true if it looks like a JWT, false otherwise.
+  """
+  def is_jwt?(value) when is_binary(value) do
+    case String.split(value, ".") do
+      [_header, _payload, _signature] -> true
+      _ -> false
+    end
+  end
+
+  def is_jwt?(_), do: false
+
+  # Private helper to obtain tokens via auth code flow
+  defp get_tokens_via_auth_code_flow(context, opts) do
+    %{
+      client: client,
+      redirect_uri: redirect_uri,
+      main_instance: main_instance,
+      discovery_document_uri: discovery_document_uri
+    } = context
+
+    # Setup provider configuration
+    {provider_key, provider_config} =
+      build_provider_config(client, main_instance, discovery_document_uri, opts)
+
+    Config.put(:openid_connect_providers, [{provider_key, provider_config}], :bonfire_open_id)
+
+    # Perform authentication flow
+    client_name = opts[:client_name] || client.name
+    auth_url = get_auth_url(client_name)
+    req = create_req_client(main_instance)
+    login_response = perform_login_flow(req, auth_url, context)
+
+    # Extract and exchange authorization code
+    query_params = extract_query_params(login_response)
+    auth_code = query_params["code"]
+
+    assert auth_code,
+           "Should receive authorization code"
+
+    # Exchange code for tokens
+    {:ok, token_response} =
+      exchange_code_for_tokens(discovery_document_uri, req, client, auth_code, redirect_uri)
+
+    assert %{
+             "access_token" => access_token,
+             "id_token" => id_token
+           } = token_response.body
+
+    debug(access_token, "access_token obtained")
+    debug(id_token, "id_token obtained")
+
+    {access_token, id_token, main_instance}
+  end
+
+  @doc """
+  Verifies a JWT signature using JWKS keys.
+
+  Extracts the `kid` from JWT header and attempts to verify signature:
+  - First tries to find matching key by `kid`
+  - If `kid` not found, logs warning and tries all keys
+  - Returns decoded claims if ANY key successfully verifies signature
+  - Raises assertion error if no key can verify the signature
+  """
+  def verify_jwt_signature(jwt, jwks_keys) when is_binary(jwt) and is_list(jwks_keys) do
+    # Normalize JWT string (strip surrounding quotes/whitespace that some responses include)
+    jwt = sanitize_jwt(jwt)
+
+    # Extract JWT header to get kid
+    [header_b64, payload_b64, signature_b64] =
+      String.split(jwt, ".")
+      |> debug("Splitting JWT into parts")
+
+    header =
+      header_b64
+      |> add_base64_padding()
+      |> Base.decode64!()
+      |> Jason.decode!()
+
+    kid = header["kid"]
+
+    # Try to find matching key
+    case Enum.find(jwks_keys, &(&1["kid"] == kid)) do
+      nil when kid ->
+        debug(kid, "JWKS key ID not found in keys, trying all available keys")
+        verify_with_all_keys(jwt, jwks_keys, [])
+
+      nil ->
+        debug("No kid in JWT header, trying all available keys")
+        verify_with_all_keys(jwt, jwks_keys, [])
+
+      matching_key ->
+        debug(kid, "Found matching JWKS key, verifying signature")
+        verify_jwt_with_key(jwt, matching_key, [kid])
+    end
+  end
+
+  # Helper to sanitize JWT strings that may include surrounding quotes/whitespace
+  # FIXME: check if the server is returning quoted strings incorrectly
+  defp sanitize_jwt(jwt) when is_binary(jwt) do
+    jwt
+    |> String.trim()
+    |> String.trim_leading("\"")
+    |> String.trim_trailing("\"")
+    |> String.trim_leading("'")
+    |> String.trim_trailing("'")
+  end
+
+  @doc """
+  Attempts to verify JWT signature with a specific JWK key.
+
+  Returns decoded claims if signature is valid, or error tuple with attempted key IDs.
+  """
+  def verify_jwt_with_key(jwt, jwk_key, attempted_kids \\ []) do
+    try do
+      # Convert JWK to JOSE key format and verify
+      jose_key = JOSE.JWK.from_map(jwk_key)
+
+      case JOSE.JWT.verify(jose_key, jwt) do
+        {true, jwt_struct, _} ->
+          # Signature valid, extract claims
+          jwt_struct.fields
+          |> debug("JWT signature verified successfully")
+
+        {false, _jwt_struct, _} ->
+          # Signature invalid with this key
+          {:error, {:signature_invalid, attempted_kids}}
+      end
+    rescue
+      e ->
+        debug(e, "Error verifying JWT with key")
+        {:error, {:verification_failed, attempted_kids}}
+    end
+  end
+
+  @doc """
+  Attempts to verify JWT signature using all available JWKS keys.
+
+  Tries each key in sequence, collecting errors. Returns claims if ANY key succeeds,
+  or fails with comprehensive error report if none work.
+  """
+  def verify_with_all_keys(jwt, [], attempted_kids) do
+    # No keys left to try
+    assert false,
+           "JWT signature could not be verified with any available key. Attempted key IDs: #{inspect(attempted_kids)}"
+  end
+
+  def verify_with_all_keys(jwt, [key | remaining_keys], attempted_kids) do
+    kid = key["kid"]
+
+    case verify_jwt_with_key(jwt, key, [kid | attempted_kids]) do
+      {:error, _reason} ->
+        # This key didn't work, try next one
+        debug(kid, "JWT signature verification failed with this key, trying next")
+        verify_with_all_keys(jwt, remaining_keys, [kid | attempted_kids])
+
+      claims when is_map(claims) ->
+        # Success! Return claims
+        claims
+    end
+  end
+
+  # Helper to add base64 padding
+  defp add_base64_padding(b64_string) do
+    case rem(String.length(b64_string), 4) do
+      0 -> b64_string
+      n -> b64_string <> String.duplicate("=", 4 - n)
+    end
+  end
+
+  @doc """
+  Fetches JWKS endpoint and returns the keys for signature verification.
+
+  Verifies:
+  - Endpoint returns 200 status
+  - Response contains "keys" array
+  - Each key has required JWK fields
+  """
+  def fetch_and_verify_jwks_keys(main_instance) do
+    {:ok, jwks_response} = Req.get("#{main_instance}/openid/jwks")
+
+    assert jwks_response.status == 200,
+           "JWKS endpoint should return 200"
+
+    assert %{"keys" => keys} = jwks_response.body,
+           "JWKS response should contain 'keys' array"
+
+    assert is_list(keys) and length(keys) > 0,
+           "Keys should be a non-empty array"
+
+    # Validate each key
+    Enum.each(keys, &verify_jwk_key_format/1)
+
+    debug(keys, "JWKS keys verified and ready for signature verification")
+    keys
+  end
+
+  @doc """
+  Verifies consistency between ID token and Userinfo endpoint claims.
+
+  Verifies ID token signature using JWKS keys, then checks that
+  the 'sub' claim matches between ID token and userinfo.
+  """
+  def verify_id_token_userinfo_consistency(id_token, main_instance, access_token) do
+    # Fetch JWKS keys for signature verification
+    jwks_keys = fetch_and_verify_jwks_keys(main_instance)
+
+    # Verify ID token signature using JWKS keys
+    id_token_claims = verify_jwt_signature(id_token, jwks_keys)
+
+    assert is_map(id_token_claims),
+           "ID token signature verification should return claims map"
+
+    # Verify userinfo endpoint
+    userinfo = verify_userinfo_endpoint_with_keys(main_instance, access_token, jwks_keys)
+
+    # Compare subject claims
+    assert id_token_claims["sub"] == userinfo["sub"],
+           "Subject (sub) claim should match between ID token and userinfo"
+
+    debug("ID token signature verified and claims are consistent with userinfo")
+  end
+
+  @doc """
+  Tests JWKS and Userinfo endpoints together in a single flow.
+
+  Performs an authorization code flow to obtain tokens, then verifies:
+  - JWKS endpoint returns valid JWK keys
+  - ID token signature is valid using JWKS keys
+  - Userinfo endpoint returns required claims
+  - Response formats match OpenID Connect spec
+  """
+
+  def test_jwks_and_userinfo_flow(context, opts) do
+    TestInstanceRepo.apply(fn ->
+      # Get tokens via authorization code flow
+      {access_token, id_token, main_instance} =
+        get_tokens_via_auth_code_flow(context, opts)
+
+      # Raw check: fetch userinfo without Req decoding to detect quoted JWT strings
+      req = create_req_client(main_instance)
+
+      {:ok, raw_resp} =
+        Req.get(req,
+          url: "#{main_instance}/openid/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}],
+          decode_body: false
+        )
+
+      # Normalize header access (Resp.headers may be map or list)
+      content_type =
+        case raw_resp.headers do
+          %{} = m ->
+            Map.get(m, "content-type") || Map.get(m, "Content-Type")
+
+          l when is_list(l) ->
+            l
+            |> Enum.find_value(fn
+              {k, v} when is_binary(k) ->
+                if String.downcase(k) == "content-type", do: v, else: nil
+
+              _ ->
+                nil
+            end)
+
+          _ ->
+            nil
+        end
+        |> List.wrap()
+        |> List.first()
+
+      raw_body = to_string(raw_resp.body || "")
+
+      # If server returned a JSON-encoded string (quoted JWT) we want to fail the test and show helpful message
+      trimmed = raw_body |> String.trim()
+
+      preview =
+        trimmed
+        |> String.replace("\n", " ")
+
+      # Detect quoted JWTs even when content-type is application/jwt
+      is_json_quoted =
+        content_type &&
+          String.contains?(String.downcase(content_type), "application/json") &&
+          String.starts_with?(trimmed, "\"") &&
+          String.ends_with?(trimmed, "\"")
+
+      # JWTs typically start with "eyJ"; detect if the server wrapped that JWT in quotes
+      is_jwt_quoted =
+        content_type &&
+          String.contains?(String.downcase(content_type), "application/jwt") &&
+          (String.starts_with?(trimmed, "\"eyJ") ||
+             String.starts_with?(trimmed, "\\\"eyJ") ||
+             (String.starts_with?(trimmed, "\"") && String.ends_with?(trimmed, "\"") &&
+                String.contains?(trimmed, "eyJ")))
+
+      if is_json_quoted || is_jwt_quoted do
+        flunk(
+          "userinfo endpoint returned a quoted JWT string with content-type #{inspect(content_type)}. " <>
+            "The server should return a raw JWT with content-type `application/jwt` (no JSON quoting) or return JSON claims as an object. " <>
+            "Preview: #{preview}"
+        )
+      else
+        debug(
+          preview,
+          "Userinfo endpoint response with content_type #{content_type} looks correctly formatted"
+        )
+      end
+
+      # Continue with full verification (JWKS + ID token + userinfo)
+      verify_id_token_userinfo_consistency(id_token, main_instance, access_token)
+
+      debug("JWKS and Userinfo flow test successful!")
+    end)
   end
 end
