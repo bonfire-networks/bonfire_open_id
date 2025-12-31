@@ -1,6 +1,7 @@
 defmodule Bonfire.OpenID.OAuthDance do
   # use Patch, only: []
   import ExUnit.Assertions
+  import Bonfire.OpenID.DanceCase
 
   use Arrows
   import Untangle
@@ -13,35 +14,55 @@ defmodule Bonfire.OpenID.OAuthDance do
 
   def setup do
     client_id = Faker.UUID.v4()
-    redirect_uri = "http://localhost:4002/oauth/client/" <> client_id
     main_instance = "http://localhost:4000"
+    secondary_instance = "http://localhost:4002"
+    redirect_uri = "#{main_instance}/oauth/client/" <> client_id
 
     # Create client with OAuth scopes (different from OpenID Connect scopes)
-    %Boruta.Ecto.Client{id: ^client_id} =
-      client =
-      ClientApps.init_test_client_app(client_id, %{
-        redirect_uris: [redirect_uri],
-        # OAuth scopes, no "openid"
-        supported_scopes: ["identity", "data:public", "read", "write"]
-      })
-      |> debug("client created?")
-      |> from_ok()
+    client =
+      TestInstanceRepo.apply(fn ->
+        %Boruta.Ecto.Client{id: ^client_id} =
+          ClientApps.init_test_client_app(client_id, %{
+            name:
+              "Test OAuth Dance Client, configured on provider (secondary instance), redirecting to client (main instance)",
+            redirect_uris: [redirect_uri],
+            # OAuth scopes, no "openid"
+            supported_scopes: ["identity", "data:public", "read", "write"]
+          })
+          |> debug("client created?")
+          |> from_ok()
+      end)
+
+    {authorize_uri, access_token_uri} = setup_oauth_provider(client, secondary_instance)
 
     %{
       client: client,
       client_id: client_id,
       redirect_uri: redirect_uri,
-      main_instance: main_instance
+      main_instance: main_instance,
+      secondary_instance: secondary_instance,
+      authorize_uri: authorize_uri,
+      access_token_uri: access_token_uri
     }
   end
 
+  def teardown(client) do
+    Config.delete(:oauth2_providers, :bonfire_open_id)
+    # Delete client from provider DB
+    TestInstanceRepo.apply(fn ->
+      repo().delete(client)
+    end)
+  end
+
   # Helper function to verify token is revoked
-  def verify_token_revoked(main_instance, access_token) do
+  def verify_token_revoked(secondary_instance, access_token) do
     {:ok, userinfo_response} =
-      Req.get(
-        "#{main_instance}/oauth/userinfo",
-        headers: [{"authorization", "Bearer #{access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{secondary_instance}/oauth/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}]
+        )
+      end)
 
     # Should return 401 Unauthorized for revoked token
     assert userinfo_response.status == 401, "Revoked access token should return 401 Unauthorized"
@@ -60,9 +81,9 @@ defmodule Bonfire.OpenID.OAuthDance do
   end
 
   # Helper function to verify refresh token is revoked
-  def verify_refresh_token_revoked(main_instance, refresh_token, client) do
-    access_token_uri = "#{main_instance}/oauth/token"
-    req = create_req_client(main_instance)
+  def verify_refresh_token_revoked(secondary_instance, refresh_token, client) do
+    access_token_uri = "#{secondary_instance}/oauth/token"
+    req = create_req_client(secondary_instance)
 
     # Try to use the revoked refresh token
     refresh_params = %{
@@ -73,10 +94,12 @@ defmodule Bonfire.OpenID.OAuthDance do
     }
 
     {:ok, refresh_response} =
-      Req.post(req,
-        url: access_token_uri,
-        form: refresh_params
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: access_token_uri,
+          form: refresh_params
+        )
+      end)
 
     # Should return 400 Bad Request for revoked/invalid refresh token
     assert refresh_response.status == 400, "Revoked refresh token should return 400 Bad Request"
@@ -87,25 +110,25 @@ defmodule Bonfire.OpenID.OAuthDance do
   end
 
   # Helper function to get initial tokens 
-  def get_initial_tokens_with_refresh(client, redirect_uri, main_instance, context) do
+  def get_initial_tokens_with_refresh(
+        client,
+        redirect_uri,
+        main_instance,
+        secondary_instance,
+        context
+      ) do
+    # Log repo in use
+    debug(Boruta.Config.repo(), "Repo in use at start of get_initial_tokens_with_refresh")
+    debug(client, "OAuth client struct")
+    debug(redirect_uri, "OAuth redirect_uri")
+    debug(secondary_instance, "OAuth secondary_instance (provider)")
+
     # Configure OAuth provider to return refresh tokens
-    authorize_uri = "#{main_instance}/oauth/authorize"
-    access_token_uri = "#{main_instance}/oauth/token"
-
-    provider_config = %{
-      client.id => [
-        display_name: client.name,
-        client_id: client.id,
-        client_secret: client.secret,
-        authorize_uri: authorize_uri,
-        access_token_uri: access_token_uri,
+    {authorize_uri, access_token_uri} =
+      setup_oauth_provider(client, secondary_instance,
         response_type: "code",
-        # offline_access often needed for refresh tokens
         scope: "identity data:public offline_access"
-      ]
-    }
-
-    Config.put(:oauth2_providers, provider_config, :bonfire_open_id)
+      )
 
     # Get authorization code
     auth_url = get_auth_url(client.name)
@@ -113,6 +136,7 @@ defmodule Bonfire.OpenID.OAuthDance do
     login_response = perform_login_flow(req, auth_url, context)
 
     query_params = extract_query_params(login_response)
+    debug(query_params, "query_params after login_response")
 
     query_params =
       if query_params == %{} do
@@ -122,6 +146,7 @@ defmodule Bonfire.OpenID.OAuthDance do
       end || query_params
 
     auth_code = query_params["code"]
+    debug(auth_code, "Authorization code before token exchange")
 
     assert auth_code, "Should receive authorization code"
 
@@ -134,11 +159,19 @@ defmodule Bonfire.OpenID.OAuthDance do
       redirect_uri: redirect_uri
     }
 
+    debug(token_params, "Token endpoint request params")
+
+    req = create_req_client(secondary_instance)
+
     {:ok, token_response} =
-      Req.post(req,
-        url: access_token_uri,
-        form: token_params
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: access_token_uri,
+          form: token_params
+        )
+      end)
+
+    debug(token_response, "Token endpoint response")
 
     # Extract both access and refresh tokens
     assert %{
@@ -166,18 +199,20 @@ defmodule Bonfire.OpenID.OAuthDance do
     }
 
     {:ok, token_response} =
-      Req.post(req,
-        url: access_token_uri,
-        form: token_params
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: access_token_uri,
+          form: token_params
+        )
+      end)
 
     token_response.body
   end
 
   # common OAuth provider setup
-  def setup_oauth_provider(client, main_instance, opts \\ []) do
-    authorize_uri = "#{main_instance}/oauth/authorize"
-    access_token_uri = "#{main_instance}/oauth/token"
+  def setup_oauth_provider(client, secondary_instance, opts \\ []) do
+    authorize_uri = "#{secondary_instance}/oauth/authorize"
+    access_token_uri = "#{secondary_instance}/oauth/token"
     scope = Keyword.get(opts, :scope, "identity data:public")
     response_type = Keyword.get(opts, :response_type, "code")
 
@@ -194,20 +229,23 @@ defmodule Bonfire.OpenID.OAuthDance do
     }
 
     Config.put(:oauth2_providers, provider_config, :bonfire_open_id)
+
     {authorize_uri, access_token_uri}
   end
 
   # Add this helper function
-  def verify_machine_to_machine_endpoint(main_instance, access_token) do
+  def verify_machine_to_machine_endpoint(secondary_instance, access_token) do
     # For client credentials, we might want to test a different endpoint
     # since there's no user context - it's machine-to-machine
 
     # Try the userinfo endpoint but expect different behavior for machine auth
     {:ok, response} =
-      Req.get(
-        "#{main_instance}/oauth/userinfo",
-        headers: [{"authorization", "Bearer #{access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{secondary_instance}/oauth/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}]
+        )
+      end)
 
     # For client credentials, the response might be different
     # It could return client info instead of user info, or an error
@@ -221,7 +259,7 @@ defmodule Bonfire.OpenID.OAuthDance do
       401 ->
         # Some systems don't allow userinfo endpoint for client credentials
         # This is also valid behavior
-        debug("Userinfo endpoint rejected client credentials token (expected behavior)")
+        info("Userinfo endpoint rejected client credentials token (expected behavior)")
 
       _ ->
         err("Unexpected response status: #{response.status}")
@@ -248,17 +286,33 @@ defmodule Bonfire.OpenID.OAuthDance do
 
   def perform_login_flow(req, auth_url, context) do
     # Fetch authorization page (might redirect)
-    {:ok, response} = Req.get(req, url: auth_url, redirect: false)
+    {:ok, response} =
+      apply_with_repo_sync(fn -> Req.get(req, url: auth_url, redirect: false) end)
+      |> flood("Initial GET auth_url response from #{auth_url}")
 
     # Handle redirect to actual authorization URL
     actual_auth_url =
       case response.status do
         302 -> response.headers["location"] |> List.first()
         303 -> response.headers["location"] |> List.first()
-        _ -> auth_url
+        _ -> raise "Expected redirect to authorization URL, got status #{response.status}"
+      end
+      |> flood("Actual Auth URL (should be on provider)")
+
+    # Parse actual_auth_url to get the correct base URL for login POST
+    uri = URI.parse(actual_auth_url)
+
+    base_url =
+      if uri.port && uri.port not in [80, 443] do
+        "#{uri.scheme}://#{uri.host}:#{uri.port}"
+      else
+        "#{uri.scheme}://#{uri.host}"
       end
 
-    {:ok, response} = Req.get(req, url: actual_auth_url, redirect: true)
+    req = create_req_client(base_url)
+
+    {:ok, response} =
+      apply_with_repo_sync(fn -> Req.get(req, url: actual_auth_url, redirect: true) end)
 
     # Extract CSRF token and form data
     doc = Floki.parse_document!(response.body)
@@ -281,7 +335,7 @@ defmodule Bonfire.OpenID.OAuthDance do
 
     # Submit login form
     form_data = %{
-      "login_fields[email_or_username]" => context.local.account.email.email_address,
+      "login_fields[email_or_username]" => context.remote.account.email.email_address,
       # Use test_password from DanceCase
       "login_fields[password]" => context.test_password,
       "go" => go_url,
@@ -289,11 +343,13 @@ defmodule Bonfire.OpenID.OAuthDance do
     }
 
     {:ok, login_response} =
-      Req.post(req,
-        url: "/login",
-        form: form_data,
-        redirect: false
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: "/login",
+          form: form_data,
+          redirect: false
+        )
+      end)
 
     assert login_response.status == 303, "Should redirect after successful login"
     login_response
@@ -324,12 +380,14 @@ defmodule Bonfire.OpenID.OAuthDance do
     |> URI.decode_query()
   end
 
-  def verify_userinfo_endpoint(main_instance, access_token) do
+  def verify_userinfo_endpoint(secondary_instance, access_token) do
     {:ok, userinfo_response} =
-      Req.get(
-        "#{main_instance}/oauth/userinfo",
-        headers: [{"authorization", "Bearer #{access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{secondary_instance}/oauth/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}]
+        )
+      end)
 
     claims = map_or_decode_jwt(userinfo_response.body)
 

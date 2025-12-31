@@ -2,6 +2,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   @behaviour Boruta.Oauth.AuthorizeApplication
 
   use Bonfire.UI.Common.Web, :controller
+  use Bonfire.Common.Repo
 
   alias Boruta.Oauth.AuthorizeResponse
   alias Boruta.Oauth.Error
@@ -14,6 +15,9 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   def authorize(%Plug.Conn{} = conn, _params) do
     conn = store_user_return_to(conn)
     # |> put_unsigned_request()
+
+    # Map.get(conn, :query_params)
+    # |> flood("Authorize request with params")
 
     with {:unchanged, conn} <- prompt_redirection(conn),
          resource_owner = get_resource_owner(conn),
@@ -87,7 +91,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         %Error{status: status, error: error, error_description: error_description}
       ) do
     if error == :invalid_client do
-      debug(repo().all(Boruta.Ecto.Client), "known clients")
+      repo().all(from Boruta.Ecto.Client, order_by: [desc: :updated_at])
+      |> IO.inspect(label: "Clients in DB in #{Config.repo()}")
     end
 
     error(error, inspect(error_description))

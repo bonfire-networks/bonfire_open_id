@@ -1,6 +1,7 @@
 defmodule Bonfire.OpenID.OIDCDance do
   # use Patch, only: []
   import ExUnit.Assertions
+  import Bonfire.OpenID.DanceCase
 
   use Arrows
   import Untangle
@@ -13,27 +14,47 @@ defmodule Bonfire.OpenID.OIDCDance do
 
   def setup do
     client_id = Faker.UUID.v4()
-    redirect_uri = "http://localhost:4002/openid/client/" <> client_id
     main_instance = "http://localhost:4000"
-    discovery_document_uri = "#{main_instance}/.well-known/openid-configuration"
+    secondary_instance = "http://localhost:4002"
+    redirect_uri = "#{main_instance}/oauth/client/" <> client_id
+    discovery_document_uri = "#{secondary_instance}/.well-known/openid-configuration"
 
     # Create client with OpenID Connect scopes
-    assert %Boruta.Ecto.Client{id: ^client_id} =
-             client =
-             ClientApps.init_test_client_app(client_id, %{
-               redirect_uris: [redirect_uri],
-               supported_scopes: ["openid", "profile", "email", "identity", "data:public"]
-             })
-             |> debug("client created")
-             |> from_ok()
+    client =
+      TestInstanceRepo.apply(fn ->
+        %Boruta.Ecto.Client{id: ^client_id} =
+          ClientApps.init_test_client_app(client_id, %{
+            name:
+              "Test OIDC Dance Client (primary instance, configured on provider (secondary instance), redirecting to client (main instance)",
+            redirect_uris: [redirect_uri],
+            supported_scopes: ["openid", "profile", "email", "identity", "data:public"]
+          })
+          |> debug("client created")
+          |> from_ok()
+      end)
+
+    # Setup provider configuration
+    {provider_key, provider_config} =
+      build_provider_config(client, discovery_document_uri)
+
+    Config.put([:bonfire_open_id, :openid_connect_providers], [{provider_key, provider_config}])
 
     %{
       client: client,
       client_id: client_id,
       redirect_uri: redirect_uri,
       main_instance: main_instance,
+      secondary_instance: secondary_instance,
       discovery_document_uri: discovery_document_uri
     }
+  end
+
+  def teardown(client) do
+    Config.delete(:openid_connect_providers, :bonfire_open_id)
+
+    TestInstanceRepo.apply(fn ->
+      repo().delete(client)
+    end)
   end
 
   def test_oidc_flow(
@@ -41,59 +62,58 @@ defmodule Bonfire.OpenID.OIDCDance do
           client: client,
           redirect_uri: redirect_uri,
           main_instance: main_instance,
+          secondary_instance: secondary_instance,
           discovery_document_uri: discovery_document_uri
         } = context,
         opts
       ) do
-    TestInstanceRepo.apply(fn ->
-      assert Boruta.Config.repo() == TestInstanceRepo
+    # Override provider configuration (to apply opts)
+    {provider_key, provider_config} =
+      build_provider_config(client, discovery_document_uri, opts)
 
-      # Setup provider configuration
-      {provider_key, provider_config} =
-        build_provider_config(client, main_instance, discovery_document_uri, opts)
+    Config.put([:bonfire_open_id, :openid_connect_providers], [{provider_key, provider_config}])
 
-      Config.put(:openid_connect_providers, [{provider_key, provider_config}], :bonfire_open_id)
+    # Perform authentication flow
+    client_name = opts[:client_name] || client.name
+    auth_url = get_auth_url(client_name)
+    req = create_req_client(main_instance)
+    login_response = perform_login_flow(req, auth_url, context)
 
-      # Perform authentication flow
-      client_name = opts[:client_name] || client.name
-      auth_url = get_auth_url(client_name)
-      req = create_req_client(main_instance)
-      login_response = perform_login_flow(req, auth_url, context)
+    req = create_req_client(secondary_instance)
 
-      # Handle different flow types
-      case opts.flow_type do
-        :implicit ->
-          test_implicit_flow_completion(login_response, main_instance, opts)
+    # Handle different flow types
+    case opts[:flow_type] do
+      :implicit ->
+        test_implicit_flow_completion(login_response, secondary_instance, opts)
 
-        :authorization_code ->
-          test_authorization_code_flow_completion(
-            login_response,
-            client,
-            redirect_uri,
-            discovery_document_uri,
-            req,
-            main_instance,
-            opts
-          )
+      :authorization_code ->
+        test_authorization_code_flow_completion(
+          login_response,
+          client,
+          redirect_uri,
+          discovery_document_uri,
+          req,
+          secondary_instance,
+          opts
+        )
 
-        # Add this case
-        :authorization_code_pkce ->
-          test_authorization_code_flow_completion(
-            login_response,
-            client,
-            redirect_uri,
-            discovery_document_uri,
-            req,
-            main_instance,
-            opts
-          )
-      end
+      # Add this case
+      :authorization_code_pkce ->
+        test_authorization_code_flow_completion(
+          login_response,
+          client,
+          redirect_uri,
+          discovery_document_uri,
+          req,
+          secondary_instance,
+          opts
+        )
+    end
 
-      verify_discovery_document(discovery_document_uri, main_instance)
-    end)
+    verify_discovery_document(discovery_document_uri, secondary_instance)
   end
 
-  def build_provider_config(client, main_instance, discovery_document_uri, opts) do
+  def build_provider_config(client, discovery_document_uri, opts \\ []) do
     client_name = opts[:client_name] || client.name
     provider_key = client.id
 
@@ -102,13 +122,13 @@ defmodule Bonfire.OpenID.OIDCDance do
       client_id: client.id,
       client_secret: client.secret,
       discovery_document_uri: discovery_document_uri,
-      response_type: opts.response_type,
-      scope: opts.scope
+      response_type: opts[:response_type] || "authorization_code",
+      scope: opts[:scope] || "openid profile email identity data:public"
     ]
 
     # Add PKCE parameters if this is a PKCE flow
     provider_config =
-      case opts.flow_type do
+      case opts[:flow_type] do
         :authorization_code_pkce ->
           # Generate PKCE parameters
           {code_verifier, code_challenge} = generate_pkce_params()
@@ -148,7 +168,7 @@ defmodule Bonfire.OpenID.OIDCDance do
   end
 
   # DRY: Handle implicit flow completion
-  def test_implicit_flow_completion(login_response, main_instance, _opts) do
+  def test_implicit_flow_completion(login_response, instance, _opts) do
     fragment_params = extract_fragment_params(login_response)
 
     access_token = fragment_params["access_token"]
@@ -158,7 +178,7 @@ defmodule Bonfire.OpenID.OIDCDance do
     assert access_token, "Should receive access token in redirect fragment"
     assert id_token, "Should receive ID token in redirect fragment"
 
-    verify_userinfo_endpoint(main_instance, access_token)
+    verify_userinfo_endpoint(instance, access_token)
   end
 
   def test_authorization_code_flow_completion(
@@ -167,7 +187,7 @@ defmodule Bonfire.OpenID.OIDCDance do
         redirect_uri,
         discovery_document_uri,
         req,
-        main_instance,
+        instance,
         opts
       ) do
     # Extract and exchange authorization code
@@ -209,14 +229,14 @@ defmodule Bonfire.OpenID.OIDCDance do
     # Verify claims if specified
     if verify_claims = opts[:verify_claims] do
       verify_id_token_claims(id_token, verify_claims)
-      verify_userinfo_claims(main_instance, access_token, verify_claims)
+      verify_userinfo_claims(instance, access_token, verify_claims)
     else
-      verify_userinfo_endpoint(main_instance, access_token)
+      verify_userinfo_endpoint(instance, access_token)
     end
 
     # Test cross-instance scenarios if requested
     if opts[:test_cross_instance] do
-      test_cross_instance_user_info(id_token, access_token, main_instance)
+      test_cross_instance_user_info(id_token, access_token, instance)
     end
   end
 
@@ -229,7 +249,10 @@ defmodule Bonfire.OpenID.OIDCDance do
         code_verifier,
         opts \\ %{}
       ) do
-    {:ok, discovery_response} = Req.get(discovery_document_uri)
+    {:ok, discovery_response} =
+      apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
+      |> flood("fetched discovery document for PKCE token exchange")
+
     token_endpoint = discovery_response.body["token_endpoint"]
 
     base_params = %{
@@ -249,24 +272,26 @@ defmodule Bonfire.OpenID.OIDCDance do
         Map.put(base_params, :client_secret, client.secret)
       end
 
-    Req.post(req, url: token_endpoint, form: token_params)
+    apply_with_repo_sync(fn -> Req.post(req, url: token_endpoint, form: token_params) end)
   end
 
   # Simple cross-instance user info test
-  def test_cross_instance_user_info(id_token, access_token, main_instance) do
+  def test_cross_instance_user_info(id_token, access_token, instance) do
     # Extract user identity from ID token
     user_identity = extract_user_identity(id_token)
     debug(user_identity, "user identity from ID token")
 
     # Fetch user info from remote instance
     {:ok, userinfo_response} =
-      Req.get(
-        "#{main_instance}/openid/userinfo",
-        headers: [
-          {"authorization", "Bearer #{access_token}"},
-          {"user-agent", "Bonfire-Federation/1.0"}
-        ]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{instance}/openid/userinfo",
+          headers: [
+            {"authorization", "Bearer #{access_token}"},
+            {"user-agent", "Bonfire-Federation/1.0"}
+          ]
+        )
+      end)
 
     userinfo = map_or_decode_jwt(userinfo_response.body)
     debug(userinfo, "cross-instance userinfo")
@@ -303,7 +328,10 @@ defmodule Bonfire.OpenID.OIDCDance do
 
   # DRY: Code exchange helper
   def exchange_code_for_tokens(discovery_document_uri, req, client, auth_code, redirect_uri) do
-    {:ok, discovery_response} = Req.get(discovery_document_uri)
+    {:ok, discovery_response} =
+      apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
+      |> flood("fetched discovery document")
+
     token_endpoint = discovery_response.body["token_endpoint"]
 
     token_params = %{
@@ -314,19 +342,33 @@ defmodule Bonfire.OpenID.OIDCDance do
       redirect_uri: redirect_uri
     }
 
-    Req.post(req, url: token_endpoint, form: token_params)
+    apply_with_repo_sync(fn -> Req.post(req, url: token_endpoint, form: token_params) end)
   end
 
   # DRY: Dynamic registration flow
-  def test_dynamic_registration_flow(registration_endpoint, main_instance, context) do
-    redirect_uri = "http://localhost:4002/openid/client/dynamic_test_oidc_provider"
+  def test_dynamic_registration_flow(
+        registration_endpoint,
+        main_instance,
+        secondary_instance,
+        context
+      ) do
+    redirect_uri = "#{main_instance}/openid/client/dynamic_test_oidc_provider"
+
+    req = create_req_client(secondary_instance)
 
     # Register client with the matching redirect URI
     {client_id, client_secret, registration_access_token, registration_client_uri} =
-      perform_dynamic_registration(registration_endpoint, main_instance, redirect_uri)
+      perform_dynamic_registration(req, registration_endpoint, redirect_uri)
 
     # Test the registered client works
-    test_dynamic_client_auth_flow(client_id, client_secret, redirect_uri, main_instance, context)
+    test_dynamic_client_auth_flow(
+      client_id,
+      client_secret,
+      redirect_uri,
+      main_instance,
+      secondary_instance,
+      context
+    )
 
     # Test client management endpoints
     test_client_configuration_retrieval(registration_client_uri, registration_access_token)
@@ -337,9 +379,7 @@ defmodule Bonfire.OpenID.OIDCDance do
   end
 
   # DRY: Perform dynamic registration - now accepts redirect_uri parameter
-  def perform_dynamic_registration(registration_endpoint, main_instance, redirect_uri) do
-    req = create_req_client(main_instance)
-
+  def perform_dynamic_registration(req, registration_endpoint, redirect_uri) do
     registration_request = %{
       # Use the passed redirect_uri
       "redirect_uris" => [redirect_uri],
@@ -354,11 +394,13 @@ defmodule Bonfire.OpenID.OIDCDance do
     }
 
     {:ok, registration_response} =
-      Req.post(req,
-        url: registration_endpoint,
-        json: registration_request,
-        headers: [{"content-type", "application/json"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: registration_endpoint,
+          json: registration_request,
+          headers: [{"content-type", "application/json"}]
+        )
+      end)
 
     assert registration_response.status in [200, 201], "Dynamic registration should succeed"
 
@@ -384,10 +426,11 @@ defmodule Bonfire.OpenID.OIDCDance do
         client_secret,
         redirect_uri,
         main_instance,
+        secondary_instance,
         context
       ) do
     # Configure provider with dynamically registered client
-    discovery_document_uri = "#{main_instance}/.well-known/openid-configuration"
+    discovery_document_uri = "#{secondary_instance}/.well-known/openid-configuration"
 
     # Use a consistent provider key that won't generate a new unique number
     provider_config = [
@@ -401,7 +444,7 @@ defmodule Bonfire.OpenID.OIDCDance do
       ]
     ]
 
-    Config.put(:openid_connect_providers, provider_config, :bonfire_open_id)
+    Config.put([:bonfire_open_id, :openid_connect_providers], provider_config)
 
     # Test authorization code flow with dynamic client
     auth_url =
@@ -421,7 +464,10 @@ defmodule Bonfire.OpenID.OIDCDance do
              "Dynamic client should receive authorization code"
 
     # Exchange code for tokens using the same redirect_uri
-    {:ok, discovery_response} = Req.get(discovery_document_uri)
+    {:ok, discovery_response} =
+      apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
+      |> flood("fetched discovery document for dynamic client token exchange")
+
     token_endpoint = discovery_response.body["token_endpoint"]
 
     token_params = %{
@@ -433,11 +479,15 @@ defmodule Bonfire.OpenID.OIDCDance do
       redirect_uri: redirect_uri
     }
 
+    req = create_req_client(secondary_instance)
+
     {:ok, token_response} =
-      Req.post(req,
-        url: token_endpoint,
-        form: token_params
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: token_endpoint,
+          form: token_params
+        )
+      end)
 
     # Verify tokens received
     assert %{
@@ -449,14 +499,16 @@ defmodule Bonfire.OpenID.OIDCDance do
     assert id_token, "Dynamic client should receive ID token"
 
     # Verify tokens work
-    verify_userinfo_endpoint(main_instance, access_token)
+    verify_userinfo_endpoint(secondary_instance, access_token)
 
     debug("Dynamic client authentication flow successful!")
   end
 
   # DRY: Get registration endpoint
   def get_registration_endpoint(discovery_document_uri) do
-    {:ok, discovery_response} = Req.get(discovery_document_uri)
+    {:ok, discovery_response} =
+      apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
+      |> flood("fetched discovery document")
 
     case discovery_response.body["registration_endpoint"] do
       nil -> :not_supported
@@ -465,8 +517,8 @@ defmodule Bonfire.OpenID.OIDCDance do
   end
 
   # DRY: Registration error testing
-  def test_registration_error_handling(registration_endpoint, main_instance) do
-    req = create_req_client(main_instance)
+  def test_registration_error_handling(registration_endpoint, instance) do
+    req = create_req_client(instance)
 
     invalid_registration_request = %{
       # Invalid URI format
@@ -478,11 +530,13 @@ defmodule Bonfire.OpenID.OIDCDance do
     }
 
     {:ok, error_response} =
-      Req.post(req,
-        url: registration_endpoint,
-        json: invalid_registration_request,
-        headers: [{"content-type", "application/json"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: registration_endpoint,
+          json: invalid_registration_request,
+          headers: [{"content-type", "application/json"}]
+        )
+      end)
 
     assert error_response.status == 400, "Invalid registration should return 400"
     assert %{"error" => error_type} = error_response.body
@@ -543,12 +597,14 @@ defmodule Bonfire.OpenID.OIDCDance do
   end
 
   # Helper function to verify userinfo endpoint claims
-  def verify_userinfo_claims(main_instance, access_token, expected_scopes) do
+  def verify_userinfo_claims(instance, access_token, expected_scopes) do
     {:ok, userinfo_response} =
-      Req.get(
-        "#{main_instance}/openid/userinfo",
-        headers: [{"authorization", "Bearer #{access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{instance}/openid/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}]
+        )
+      end)
 
     userinfo =
       map_or_decode_jwt(userinfo_response.body)
@@ -577,9 +633,11 @@ defmodule Bonfire.OpenID.OIDCDance do
   # Test retrieving client configuration
   def test_client_configuration_retrieval(registration_client_uri, registration_access_token) do
     {:ok, config_response} =
-      Req.get(registration_client_uri,
-        headers: [{"authorization", "Bearer #{registration_access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(registration_client_uri,
+          headers: [{"authorization", "Bearer #{registration_access_token}"}]
+        )
+      end)
 
     assert config_response.status == 200,
            debug(config_response, "Should retrieve client configuration") &&
@@ -603,17 +661,18 @@ defmodule Bonfire.OpenID.OIDCDance do
         registration_access_token,
         original_config
       ) do
-    # Update client name
     updated_config = Map.put(original_config, "client_name", "Updated Dynamic Client Name")
 
     {:ok, update_response} =
-      Req.put(registration_client_uri,
-        json: updated_config,
-        headers: [
-          {"authorization", "Bearer #{registration_access_token}"},
-          {"content-type", "application/json"}
-        ]
-      )
+      apply_with_repo_sync(fn ->
+        Req.put(registration_client_uri,
+          json: updated_config,
+          headers: [
+            {"authorization", "Bearer #{registration_access_token}"},
+            {"content-type", "application/json"}
+          ]
+        )
+      end)
 
     assert update_response.status == 200, "Should update client configuration"
 
@@ -630,64 +689,18 @@ defmodule Bonfire.OpenID.OIDCDance do
     |> debug("auth_url")
   end
 
-  def create_req_client(main_instance) do
+  def create_req_client(instance) do
     ReqCookieJar.new()
 
     Req.new(
-      base_url: main_instance,
+      base_url: instance,
       retry: false,
       cache: false
     )
     |> ReqCookieJar.attach()
   end
 
-  def perform_login_flow(req, auth_url, context) do
-    # Fetch authorization page
-    {:ok, response} = Req.get(req, url: auth_url, redirect: true)
-
-    # Extract CSRF token and form data
-
-    doc = Floki.parse_document!(response.body)
-
-    [form] =
-      doc
-      |> Floki.find("form#login-form")
-
-    csrf_token =
-      form
-      |> Floki.find("input[name=_csrf_token]")
-      |> Floki.attribute("value")
-      |> List.first() || (debug(doc) && raise "CSRF token not found")
-
-    go_url =
-      form
-      |> Floki.find("input[name=go]")
-      |> Floki.attribute("value")
-      |> List.first() || raise "redirect URI not found"
-
-    # Submit login form
-    form_data =
-      %{
-        "login_fields[email_or_username]" => context.local.account.email.email_address,
-        "login_fields[password]" => context.test_password,
-        "go" => go_url,
-        "_csrf_token" => csrf_token
-      }
-      |> debug("login form data")
-
-    {:ok, login_response} =
-      Req.post(req,
-        url: "/login",
-        form: form_data,
-        redirect: false
-      )
-      |> debug("Performed login form submission")
-
-    assert login_response.status == 303,
-           debug(login_response, "login_response") && "Should redirect after successful login"
-
-    login_response
-  end
+  defdelegate perform_login_flow(req, auth_url, context), to: Bonfire.OpenID.OAuthDance
 
   def extract_fragment_params(%{headers: headers} = _login_response),
     do: extract_fragment_params(headers["location"] |> List.first())
@@ -714,12 +727,14 @@ defmodule Bonfire.OpenID.OIDCDance do
     |> URI.decode_query()
   end
 
-  def verify_userinfo_endpoint(main_instance, access_token) do
+  def verify_userinfo_endpoint(instance, access_token) do
     {:ok, userinfo_response} =
-      Req.get(
-        "#{main_instance}/openid/userinfo",
-        headers: [{"authorization", "Bearer #{access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{instance}/openid/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}]
+        )
+      end)
 
     claims = map_or_decode_jwt(userinfo_response.body)
 
@@ -752,11 +767,13 @@ defmodule Bonfire.OpenID.OIDCDance do
     end
   end
 
-  def verify_discovery_document(discovery_document_uri, main_instance) do
-    {:ok, discovery_response} = Req.get(discovery_document_uri)
+  def verify_discovery_document(discovery_document_uri, instance) do
+    {:ok, discovery_response} =
+      apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
+      |> flood("fetched discovery document")
 
     assert %{
-             "issuer" => ^main_instance,
+             "issuer" => ^instance,
              "authorization_endpoint" => _,
              "token_endpoint" => _,
              "userinfo_endpoint" => _,
@@ -774,13 +791,13 @@ defmodule Bonfire.OpenID.OIDCDance do
       registration_endpoint ->
         debug("Server supports dynamic client registration at: #{registration_endpoint}")
 
-        assert String.starts_with?(registration_endpoint, main_instance),
+        assert String.starts_with?(registration_endpoint, instance),
                "Registration endpoint should be on same server"
     end
 
     # Verify JWT signing keys are available
     jwks_uri = discovery_response.body["jwks_uri"]
-    {:ok, jwks_response} = Req.get(jwks_uri)
+    {:ok, jwks_response} = apply_with_repo_sync(fn -> Req.get(jwks_uri) end)
     assert %{"keys" => _} = jwks_response.body
 
     # Check for other optional endpoints
@@ -803,8 +820,8 @@ defmodule Bonfire.OpenID.OIDCDance do
   - Each key has required JWK fields (kid, kty, n, e for RSA)
   - Keys are decodable
   """
-  def verify_jwks_endpoint(main_instance) do
-    {:ok, jwks_response} = Req.get("#{main_instance}/openid/jwks")
+  def verify_jwks_endpoint(instance) do
+    {:ok, jwks_response} = apply_with_repo_sync(fn -> Req.get("#{instance}/openid/jwks") end)
 
     assert jwks_response.status == 200,
            "JWKS endpoint should return 200"
@@ -857,12 +874,14 @@ defmodule Bonfire.OpenID.OIDCDance do
   - If response is JWT, verifies signature using JWKS keys
   - Returns decoded claims map
   """
-  def verify_userinfo_endpoint_with_keys(main_instance, access_token, jwks_keys) do
+  def verify_userinfo_endpoint_with_keys(instance, access_token, jwks_keys) do
     {:ok, userinfo_response} =
-      Req.get(
-        "#{main_instance}/openid/userinfo",
-        headers: [{"authorization", "Bearer #{access_token}"}]
-      )
+      apply_with_repo_sync(fn ->
+        Req.get(
+          "#{instance}/openid/userinfo",
+          headers: [{"authorization", "Bearer #{access_token}"}]
+        )
+      end)
 
     assert userinfo_response.status == 200,
            "Userinfo endpoint should return 200 with valid token"
@@ -940,14 +959,9 @@ defmodule Bonfire.OpenID.OIDCDance do
       client: client,
       redirect_uri: redirect_uri,
       main_instance: main_instance,
+      secondary_instance: secondary_instance,
       discovery_document_uri: discovery_document_uri
     } = context
-
-    # Setup provider configuration
-    {provider_key, provider_config} =
-      build_provider_config(client, main_instance, discovery_document_uri, opts)
-
-    Config.put(:openid_connect_providers, [{provider_key, provider_config}], :bonfire_open_id)
 
     # Perform authentication flow
     client_name = opts[:client_name] || client.name
@@ -974,7 +988,7 @@ defmodule Bonfire.OpenID.OIDCDance do
     debug(access_token, "access_token obtained")
     debug(id_token, "id_token obtained")
 
-    {access_token, id_token, main_instance}
+    {access_token, id_token, secondary_instance}
   end
 
   @doc """
@@ -1136,8 +1150,8 @@ defmodule Bonfire.OpenID.OIDCDance do
   - Response contains "keys" array
   - Each key has required JWK fields
   """
-  def fetch_and_verify_jwks_keys(main_instance) do
-    {:ok, jwks_response} = Req.get("#{main_instance}/openid/jwks")
+  def fetch_and_verify_jwks_keys(instance) do
+    {:ok, jwks_response} = apply_with_repo_sync(fn -> Req.get("#{instance}/openid/jwks") end)
 
     assert jwks_response.status == 200,
            "JWKS endpoint should return 200"
@@ -1161,9 +1175,9 @@ defmodule Bonfire.OpenID.OIDCDance do
   Verifies ID token signature using JWKS keys, then checks that
   the 'sub' claim matches between ID token and userinfo.
   """
-  def verify_id_token_userinfo_consistency(id_token, main_instance, access_token) do
+  def verify_id_token_userinfo_consistency(id_token, instance, access_token) do
     # Fetch JWKS keys for signature verification
-    jwks_keys = fetch_and_verify_jwks_keys(main_instance)
+    jwks_keys = fetch_and_verify_jwks_keys(instance)
 
     # Verify ID token signature using JWKS keys
     id_token_claims = verify_jwt_signature(id_token, jwks_keys)
@@ -1172,7 +1186,7 @@ defmodule Bonfire.OpenID.OIDCDance do
            "ID token signature verification should return claims map"
 
     # Verify userinfo endpoint
-    userinfo = verify_userinfo_endpoint_with_keys(main_instance, access_token, jwks_keys)
+    userinfo = verify_userinfo_endpoint_with_keys(instance, access_token, jwks_keys)
 
     # Compare subject claims
     assert id_token_claims["sub"] == userinfo["sub"],
@@ -1192,85 +1206,85 @@ defmodule Bonfire.OpenID.OIDCDance do
   """
 
   def test_jwks_and_userinfo_flow(context, opts) do
-    TestInstanceRepo.apply(fn ->
-      # Get tokens via authorization code flow
-      {access_token, id_token, main_instance} =
-        get_tokens_via_auth_code_flow(context, opts)
+    # Get tokens via authorization code flow
+    {access_token, id_token, instance} =
+      get_tokens_via_auth_code_flow(context, opts)
 
-      # Raw check: fetch userinfo without Req decoding to detect quoted JWT strings
-      req = create_req_client(main_instance)
+    # Raw check: fetch userinfo without Req decoding to detect quoted JWT strings
+    req = create_req_client(instance)
 
-      {:ok, raw_resp} =
+    {:ok, raw_resp} =
+      apply_with_repo_sync(fn ->
         Req.get(req,
-          url: "#{main_instance}/openid/userinfo",
+          url: "#{instance}/openid/userinfo",
           headers: [{"authorization", "Bearer #{access_token}"}],
           decode_body: false
         )
+      end)
 
-      # Normalize header access (Resp.headers may be map or list)
-      content_type =
-        case raw_resp.headers do
-          %{} = m ->
-            Map.get(m, "content-type") || Map.get(m, "Content-Type")
+    # Normalize header access (Resp.headers may be map or list)
+    content_type =
+      case raw_resp.headers do
+        %{} = m ->
+          Map.get(m, "content-type") || Map.get(m, "Content-Type")
 
-          l when is_list(l) ->
-            l
-            |> Enum.find_value(fn
-              {k, v} when is_binary(k) ->
-                if String.downcase(k) == "content-type", do: v, else: nil
+        l when is_list(l) ->
+          l
+          |> Enum.find_value(fn
+            {k, v} when is_binary(k) ->
+              if String.downcase(k) == "content-type", do: v, else: nil
 
-              _ ->
-                nil
-            end)
+            _ ->
+              nil
+          end)
 
-          _ ->
-            nil
-        end
-        |> List.wrap()
-        |> List.first()
-
-      raw_body = to_string(raw_resp.body || "")
-
-      # If server returned a JSON-encoded string (quoted JWT) we want to fail the test and show helpful message
-      trimmed = raw_body |> String.trim()
-
-      preview =
-        trimmed
-        |> String.replace("\n", " ")
-
-      # Detect quoted JWTs even when content-type is application/jwt
-      is_json_quoted =
-        content_type &&
-          String.contains?(String.downcase(content_type), "application/json") &&
-          String.starts_with?(trimmed, "\"") &&
-          String.ends_with?(trimmed, "\"")
-
-      # JWTs typically start with "eyJ"; detect if the server wrapped that JWT in quotes
-      is_jwt_quoted =
-        content_type &&
-          String.contains?(String.downcase(content_type), "application/jwt") &&
-          (String.starts_with?(trimmed, "\"eyJ") ||
-             String.starts_with?(trimmed, "\\\"eyJ") ||
-             (String.starts_with?(trimmed, "\"") && String.ends_with?(trimmed, "\"") &&
-                String.contains?(trimmed, "eyJ")))
-
-      if is_json_quoted || is_jwt_quoted do
-        flunk(
-          "userinfo endpoint returned a quoted JWT string with content-type #{inspect(content_type)}. " <>
-            "The server should return a raw JWT with content-type `application/jwt` (no JSON quoting) or return JSON claims as an object. " <>
-            "Preview: #{preview}"
-        )
-      else
-        debug(
-          preview,
-          "Userinfo endpoint response with content_type #{content_type} looks correctly formatted"
-        )
+        _ ->
+          nil
       end
+      |> List.wrap()
+      |> List.first()
 
-      # Continue with full verification (JWKS + ID token + userinfo)
-      verify_id_token_userinfo_consistency(id_token, main_instance, access_token)
+    raw_body = to_string(raw_resp.body || "")
 
-      debug("JWKS and Userinfo flow test successful!")
-    end)
+    # If server returned a JSON-encoded string (quoted JWT) we want to fail the test and show helpful message
+    trimmed = raw_body |> String.trim()
+
+    preview =
+      trimmed
+      |> String.replace("\n", " ")
+
+    # Detect quoted JWTs even when content-type is application/jwt
+    is_json_quoted =
+      content_type &&
+        String.contains?(String.downcase(content_type), "application/json") &&
+        String.starts_with?(trimmed, "\"") &&
+        String.ends_with?(trimmed, "\"")
+
+    # JWTs typically start with "eyJ"; detect if the server wrapped that JWT in quotes
+    is_jwt_quoted =
+      content_type &&
+        String.contains?(String.downcase(content_type), "application/jwt") &&
+        (String.starts_with?(trimmed, "\"eyJ") ||
+           String.starts_with?(trimmed, "\\\"eyJ") ||
+           (String.starts_with?(trimmed, "\"") && String.ends_with?(trimmed, "\"") &&
+              String.contains?(trimmed, "eyJ")))
+
+    if is_json_quoted || is_jwt_quoted do
+      flunk(
+        "userinfo endpoint returned a quoted JWT string with content-type #{inspect(content_type)}. " <>
+          "The server should return a raw JWT with content-type `application/jwt` (no JSON quoting) or return JSON claims as an object. " <>
+          "Preview: #{preview}"
+      )
+    else
+      debug(
+        preview,
+        "Userinfo endpoint response with content_type #{content_type} looks correctly formatted"
+      )
+    end
+
+    # Continue with full verification (JWKS + ID token + userinfo)
+    verify_id_token_userinfo_consistency(id_token, instance, access_token)
+
+    debug("JWKS and Userinfo flow test successful!")
   end
 end

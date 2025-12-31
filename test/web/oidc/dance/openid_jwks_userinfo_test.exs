@@ -1,4 +1,4 @@
-defmodule Bonfire.OpenID.OIDCAuthCodeDanceTest do
+defmodule Bonfire.OpenID.JwksUserinfoDanceTest do
   use Bonfire.OpenID.DanceCase, async: false
   use Patch, only: []
   import Bonfire.OpenID.OIDCDance
@@ -15,16 +15,16 @@ defmodule Bonfire.OpenID.OIDCAuthCodeDanceTest do
   alias Bonfire.OpenID.Provider.ClientApps
 
   setup do
-    setup()
+    context = setup()
+    on_exit(fn -> teardown(context.client) end)
+    context
   end
 
-  test "can login using OpenID Connect with authorization code flow + fetch cross-instance user info",
-       context do
-    test_oidc_flow(context, %{
+  test "can verify JWKS and Userinfo endpoints via authorization code flow", context do
+    test_jwks_and_userinfo_flow(context, %{
       response_type: "authorization_code",
       scope: "openid profile email identity data:public",
-      flow_type: :authorization_code,
-      test_cross_instance: true
+      flow_type: :authorization_code
     })
   end
 end

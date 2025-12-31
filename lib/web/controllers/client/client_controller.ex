@@ -18,7 +18,11 @@ defmodule Bonfire.OpenID.Web.ClientController do
               redirect_to(conn, url, type: :maybe_external)
 
             other ->
-              error(other, "OpenID redirect URL could not be generated for provider: #{provider}")
+              error(
+                other,
+                "OpenID redirect URL could not be generated for provider: #{Types.to_string_or_inspect(provider)}"
+              )
+
               debug(provider_config, "provider")
 
               raise Bonfire.Fail, {:not_found, "Provider could not be reached"}
@@ -50,14 +54,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
             ) || with_oauth2(conn, provider, Map.new(provider_config), params)
           end
         else
-          raise Bonfire.Fail, {:not_found, "Provider #{inspect(provider)}"}
+          raise Bonfire.Fail, {:not_found, "Provider #{Types.to_string_or_inspect(provider)}"}
         end
       end
     else
       other ->
         error(other, "Provider not found")
 
-        raise Bonfire.Fail, {:not_found, "Provider #{inspect(provider)}"}
+        raise Bonfire.Fail, {:not_found, "Provider #{Types.to_string_or_inspect(provider)}"}
     end
   end
 

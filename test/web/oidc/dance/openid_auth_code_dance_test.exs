@@ -1,4 +1,4 @@
-defmodule Bonfire.OpenID.OIDCPKCEDanceTest do
+defmodule Bonfire.OpenID.OIDCAuthCodeDanceTest do
   use Bonfire.OpenID.DanceCase, async: false
   use Patch, only: []
   import Bonfire.OpenID.OIDCDance
@@ -15,15 +15,18 @@ defmodule Bonfire.OpenID.OIDCPKCEDanceTest do
   alias Bonfire.OpenID.Provider.ClientApps
 
   setup do
-    setup()
+    context = setup()
+    on_exit(fn -> teardown(context.client) end)
+    context
   end
 
-  test "can login using OpenID Connect with PKCE flow", context do
+  test "can login using OpenID Connect with authorization code flow + fetch cross-instance user info",
+       context do
     test_oidc_flow(context, %{
       response_type: "authorization_code",
       scope: "openid profile email identity data:public",
-      flow_type: :authorization_code_pkce,
-      client_name: "PKCE Test Client"
+      flow_type: :authorization_code,
+      test_cross_instance: true
     })
   end
 end

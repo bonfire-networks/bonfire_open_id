@@ -1,24 +1,26 @@
 defmodule Bonfire.OpenID.Client do
   import Untangle
   use Arrows
+  use Bonfire.Common.Config
   use Bonfire.Common.Localise
   use Bonfire.Common.E
   alias Bonfire.Common.Utils
   alias Bonfire.Common.Types
 
-  def open_id_connect_providers,
-    do:
-      Application.get_env(:bonfire_open_id, :openid_connect_providers, [])
-      |> Enum.map(fn {provider, config} ->
-        {provider, config |> Enum.into(%{redirect_uri: provider_url(provider, :openid)})}
-      end)
+  def open_id_connect_providers do
+    Config.get([:bonfire_open_id, :openid_connect_providers], [])
+    |> Enum.map(fn {provider, config} ->
+      {provider, config |> Enum.into(%{redirect_uri: provider_url(provider, :openid)})}
+    end)
+  end
 
-  def oauth2_providers,
-    do:
-      Application.get_env(:bonfire_open_id, :oauth2_providers, [])
-      |> Enum.map(fn {provider, config} ->
-        {provider, config |> Enum.into(%{redirect_uri: provider_url(provider, :oauth)})}
-      end)
+  def oauth2_providers do
+    Config.get([:bonfire_open_id, :oauth2_providers], [])
+    |> flood("Fetched OAuth2 providers in #{Config.repo()}")
+    |> Enum.map(fn {provider, config} ->
+      {provider, config |> Enum.into(%{redirect_uri: provider_url(provider, :oauth)})}
+    end)
+  end
 
   def providers() do
     open_id_connect_providers() ++ oauth2_providers()

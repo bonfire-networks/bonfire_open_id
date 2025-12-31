@@ -15,7 +15,9 @@ defmodule Bonfire.OpenID.OIDCPKCEPublicClientDanceTest do
   alias Bonfire.OpenID.Provider.ClientApps
 
   setup do
-    setup()
+    context = setup()
+    on_exit(fn -> teardown(context.client) end)
+    context
   end
 
   @tag :fixme
@@ -27,21 +29,24 @@ defmodule Bonfire.OpenID.OIDCPKCEPublicClientDanceTest do
        } = context do
     # Create a public client (no client_secret)
     public_client_id = Faker.UUID.v4()
-    redirect_uri = "http://localhost:4002/oauth/client/" <> public_client_id
+    redirect_uri = "#{main_instance}/oauth/client/" <> public_client_id
 
-    assert %Boruta.Ecto.Client{id: ^public_client_id} =
-             public_client =
-             ClientApps.init_test_client_app(public_client_id, %{
-               name: "Public Client for PKCE Test",
-               redirect_uris: [redirect_uri],
-               pkce: true,
-               supported_scopes: ["openid", "profile", "email", "identity", "data:public"],
-               # Public client
-               confidential: false
-               #  secret: nil
-             })
-             |> debug("public PKCE client created")
-             |> from_ok()
+    public_client =
+      TestInstanceRepo.apply(fn ->
+        assert %Boruta.Ecto.Client{id: ^public_client_id} =
+                 ClientApps.init_test_client_app(public_client_id, %{
+                   name:
+                     "Public Client for PKCE Test (secondary test instance, redirecting to primary instance)",
+                   redirect_uris: [redirect_uri],
+                   pkce: true,
+                   supported_scopes: ["openid", "profile", "email", "identity", "data:public"],
+                   # Public client
+                   confidential: false
+                   #  secret: nil
+                 })
+                 |> debug("public PKCE client created")
+                 |> from_ok()
+      end)
 
     # Test PKCE flow with public client
     test_oidc_flow(Map.put(context, :client, public_client), %{

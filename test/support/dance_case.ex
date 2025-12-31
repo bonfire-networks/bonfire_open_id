@@ -1,5 +1,6 @@
 defmodule Bonfire.OpenID.DanceCase do
   use ExUnit.CaseTemplate
+  use Bonfire.Common.Config
   import Tesla.Mock
   import Untangle
   import Bonfire.UI.Common.Testing.Helpers
@@ -40,6 +41,20 @@ defmodule Bonfire.OpenID.DanceCase do
         end),
       test_password: test_password
     ]
+  end
+
+  @doc """
+  Wraps a function call and ensures Boruta.Config.repo() is synced with Config.repo() after the call.
+  Use for all Req.get/Req.post calls in tests to avoid global repo contamination.
+  """
+  def apply_with_repo_sync(fun) when is_function(fun, 0) do
+    result = fun.()
+
+    if Boruta.Config.repo() != Bonfire.Common.Config.repo() do
+      Bonfire.Common.Config.put([Boruta.Oauth, :repo], Bonfire.Common.Config.repo())
+    end
+
+    result
   end
 end
 

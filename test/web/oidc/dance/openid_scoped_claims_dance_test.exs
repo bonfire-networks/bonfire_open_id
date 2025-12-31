@@ -15,7 +15,9 @@ defmodule Bonfire.OpenID.OIDCScopedClaimsDanceTest do
   alias Bonfire.OpenID.Provider.ClientApps
 
   setup do
-    setup()
+    context = setup()
+    on_exit(fn -> teardown(context.client) end)
+    context
   end
 
   test "returns correct claims for different scopes", context do
