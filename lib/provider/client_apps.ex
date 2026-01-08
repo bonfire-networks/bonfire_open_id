@@ -227,7 +227,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # ID token signature algorithm, defaults to "RS512"
       id_token_signature_alg: "RS256",
       # userinfo signature algorithm, defaults to nil (no signature)
-      userinfo_signed_response_alg: "RS256",
+      # userinfo_signed_response_alg: "RS256",
       # OAuth client redirect_uris
       redirect_uris: ["#{Bonfire.Common.URIs.base_url()}/oauth/ready"],
       # take following authorized_scopes into account (skip public scopes)

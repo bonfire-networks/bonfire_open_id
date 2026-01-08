@@ -389,8 +389,8 @@ defmodule Bonfire.OpenID.OIDCDance do
       "scope" => "openid profile email identity data:public",
       "application_type" => "web",
       "subject_type" => "public",
-      "id_token_signed_response_alg" => "RS256",
-      "userinfo_signed_response_alg" => "none"
+      "id_token_signed_response_alg" => "RS256"
+      # "userinfo_signed_response_alg" => "none"
     }
 
     {:ok, registration_response} =
