@@ -30,7 +30,6 @@ defmodule Bonfire.OpenID.OIDCDance do
             supported_scopes: ["openid", "profile", "email", "identity", "data:public"]
           })
           |> debug("client created")
-          |> from_ok()
       end)
 
     # Setup provider configuration

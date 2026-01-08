@@ -45,7 +45,6 @@ defmodule Bonfire.OpenID.OIDCPKCEPublicClientDanceTest do
                    #  secret: nil
                  })
                  |> debug("public PKCE client created")
-                 |> from_ok()
       end)
 
     # Test PKCE flow with public client

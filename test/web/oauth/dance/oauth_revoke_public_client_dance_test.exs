@@ -48,7 +48,6 @@ defmodule Bonfire.OpenID.OAuthRevokePublicClientDanceTest do
                    confidential: false
                  })
                  |> debug("public client created")
-                 |> from_ok()
       end)
 
     # Get tokens for public client

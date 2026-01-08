@@ -1,5 +1,6 @@
 defmodule Bonfire.OpenID.Provider.ClientApps do
   use Bonfire.Common.Repo
+  use Arrows
   import Bonfire.Common.Utils
   # alias Bonfire.Common.Enums
   alias Bonfire.Common.Types
@@ -67,12 +68,12 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def get_or_new(id_or_name, redirect_uris, attrs \\ %{}) do
     id = id_or_name_to_id(id_or_name)
 
-    case get(id, id_or_name, redirect_uris) |> debug("got") do
+    case get(id, id_or_name, redirect_uris) |> flood("got") do
       nil ->
         redirect_uris = List.wrap(redirect_uris)
 
         new(Map.merge(%{id: id, name: id_or_name, redirect_uris: redirect_uris}, attrs))
-        |> debug("newed")
+        |> flood("newed")
 
       client ->
         {:ok, client}
@@ -80,8 +81,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   end
 
   def get_or_new(clauses) do
-    case get(clauses) |> debug("got") do
-      nil -> new(Map.new(clauses)) |> debug("newed")
+    case get(clauses) |> flood("got") do
+      nil -> new(Map.new(clauses)) |> flood("newed")
       client -> {:ok, client}
     end
   end
@@ -186,13 +187,13 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
         name: id_or_name,
         redirect_uris: redirect_uris
       }
-      |> debug("map")
+      |> flood("map")
     )
   end
 
   def new(id, id_or_name, redirect_uri)
       when is_binary(id_or_name) and is_binary(redirect_uri) do
-    new(id, id_or_name, [redirect_uri] |> debug("uri"))
+    new(id, id_or_name, [redirect_uri] |> flood("uri"))
   end
 
   def new(params) when is_map(params) do
@@ -263,12 +264,15 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # token_endpoint_jwt_auth_alg: nil, # associated to authentication methods, the algorithm to use along
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
-    |> Map.merge(params)
+    |> Map.merge(params 
+        |> flood("input params for client")
+    )
     # OAuth client_secret
     |> Map.put_new_lazy(:secret, fn -> SecureRandom.hex(64) end)
-    |> debug("map to create")
+    |> flood("full data for client to create")
     # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
+    |> flood("client created")
   end
 
   def init_test_client_app(id \\ "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", attrs \\ %{}) do
@@ -276,6 +280,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       nil -> new(Map.merge(%{id: id, name: "Test client app"}, attrs))
       client -> client
     end
+    |> from_ok()
   end
 
   def prepare_redirect_uris(other) when is_binary(other) do
@@ -295,13 +300,13 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
     # Validate required fields
     with {:ok, validated_params} <-
            params
-           |> debug("input params")
+           |> flood("dynamic client input params")
            |> validate_registration_params()
-           |> debug("validated params") do
+           |> flood("dynamic client validated input params") do
       registration_access_token = generate_registration_access_token()
       client_id = generate_client_id()
 
-      # Store registration token in metadata since Boruta doesn't have a dedicated field
+      # NOTE: we store registration token in metadata since Boruta doesn't have a dedicated field
       client_params = %{
         id: client_id,
         redirect_uris: validated_params["redirect_uris"],
@@ -311,6 +316,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
         # Store registration token in metadata
         metadata: %{"registration_access_token" => registration_access_token}
       }
+      |> flood("create params for dynamic client")
 
       case new(client_params) do
         {:ok, client} ->
@@ -348,8 +354,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
       client ->
         # Debug what we actually have
-        debug(client.metadata, "client metadata")
-        debug(registration_token, "looking for token")
+        flood(client.metadata, "client metadata")
+        flood(registration_token, "looking for token")
         {:error, :invalid_token}
     end
   end
@@ -482,7 +488,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   defp validate_registration_params(params) do
     # Skip redirect_uri validation for device code flow
-    debug(params, "validating params")
+    flood(params, "validating params")
     grant_type = params["grant_type"]
     application_type = params["application_type"] || "web"
 

@@ -8,7 +8,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
   def create(conn, %{"provider" => provider} = params) do
     params = Map.drop(params, ["provider"])
 
-    with provider when not is_nil(provider) <- maybe_to_atom(provider) |> debug("provider") do
+    with provider when not is_nil(provider) <- maybe_to_atom(provider) |> flood("provider") do
       if provider_config = ed(Client.open_id_connect_providers(), provider, nil) do
         #  redirect to authorization URL
         if params == %{} do
@@ -23,7 +23,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
                 "OpenID redirect URL could not be generated for provider: #{Types.to_string_or_inspect(provider)}"
               )
 
-              debug(provider_config, "provider")
+              flood(provider_config, "provider")
 
               raise Bonfire.Fail, {:not_found, "Provider could not be reached"}
           end
@@ -38,7 +38,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
         end
       else
         if provider_config = ed(Client.oauth2_providers(), provider, nil) do
-          debug(provider_config)
+          flood(provider_config)
           # start flow: redirect to remote authorization URL
           if params == %{} do
             redirect_to(conn, oauth_provider_url(provider, provider_config),
@@ -88,7 +88,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
       "#{config[:authorize_uri]}?#{params}"
     else
       _ ->
-        debug(
+        flood(
           Client.oauth2_providers(),
           "OAuth2 provider config not found for #{inspect(provider)}"
         )
@@ -127,7 +127,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
       |> OpenIDConnect.authorization_uri(openid_callback_url(provider), additional_params)
     else
       _ ->
-        debug(
+        flood(
           Client.open_id_connect_providers(),
           "OpenID provider config not found for #{inspect(provider)}"
         )
@@ -155,7 +155,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
          } = config,
          %{"code" => code} = _params
        ) do
-    debug(code, "Received OAuth code at #{DateTime.utc_now()}")
+    flood(code, "Received OAuth code at #{DateTime.utc_now()}")
 
     query =
       URI.encode_query(%{
@@ -176,14 +176,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
                {"accept", "application/json"}
              ]
            )
-           |> debug("token_result"),
+           |> flood("token_result"),
          #  Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
          %{"access_token" => access_token} = token_data <-
            (case Jason.decode(token_result) do
               {:ok, data} -> data
               _ -> URI.decode_query(token_result)
             end)
-           |> debug("token_data"),
+           |> flood("token_data"),
          {:ok, %{body: userinfo_body}} <- user_info_body(config[:userinfo_uri], access_token),
          {:ok, userinfo} <- Jason.decode(userinfo_body) do
       process_external_auth(conn, provider, config, Enum.into(userinfo, token_data))
@@ -215,7 +215,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
         redirect_uri: redirect_uri
       })
 
-    redirect_to(conn, debug("#{authorize_uri}?#{query}"), type: :maybe_external)
+    redirect_to(conn, flood("#{authorize_uri}?#{query}"), type: :maybe_external)
   end
 
   defp with_open_id_connect(conn, provider, provider_config, params) do
@@ -293,7 +293,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   defp process_external_auth(conn, provider, provider_config, params) do
-    # debug(conn)
+    # flood(conn)
 
     if current_user = current_user(conn) do
       info(params, "params")
@@ -383,7 +383,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
   end
 
   defp handle_unknown_account_with_no_email(conn, provider, params) do
-    debug(params, "no existing account found, and no email provided")
+    flood(params, "no existing account found, and no email provided")
 
     # WIP: support sign up with openid/oauth providers who don't provide the user's email address, we need to have a form to request for an email address (and maybe optionally a PW too) so we can create an account for them and then link it to the provider token (we can skip email confirmation)
 

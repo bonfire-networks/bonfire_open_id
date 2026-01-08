@@ -26,7 +26,7 @@ defmodule Bonfire.OpenID.Web.Oauth.TokenController do
   @impl Boruta.Oauth.TokenApplication
   def token_error(conn, %Error{status: status, error: error, error_description: error_description}) do
     error(error, inspect(error_description))
-    debug(conn)
+    flood(conn)
 
     conn
     |> put_status(status)

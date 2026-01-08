@@ -26,7 +26,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     query_params =
       Plug.Conn.Query.decode(query)
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
-      |> debug()
+      |> flood()
 
     authorize(%{conn | query_params: query_params}, query_params)
   end
@@ -57,7 +57,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     # |> Plug.Conn.put_status(303) # TODO? to support redirect after a POST
     |> redirect_to(
       AuthorizeResponse.redirect_to_url(response)
-      |> debug(),
+      |> flood(),
       type: :maybe_external
     )
   end

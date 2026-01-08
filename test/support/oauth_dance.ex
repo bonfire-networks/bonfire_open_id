@@ -30,7 +30,6 @@ defmodule Bonfire.OpenID.OAuthDance do
             supported_scopes: ["identity", "data:public", "read", "write"]
           })
           |> debug("client created?")
-          |> from_ok()
       end)
 
     {authorize_uri, access_token_uri} = setup_oauth_provider(client, secondary_instance)

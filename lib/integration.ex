@@ -25,7 +25,7 @@ defmodule Bonfire.OpenID do
       Keyword.has_key?(opts, :username) -> get_user(opts[:username])
       true -> err(opts, "Invalid options to get user")
     end
-    |> debug("get_by with opts #{inspect(opts)}")
+    |> flood("get_by with opts #{inspect(opts)}")
   end
 
   def get_user(id_or_username) when is_binary(id_or_username) do
@@ -43,7 +43,7 @@ defmodule Bonfire.OpenID do
       %{} = user -> get_user(user)
       _ -> error(conn, "User not found")
     end
-    |> debug("get_user with conn")
+    |> flood("get_user with conn")
   end
 
   def get_user(%{id: id} = current_user) do
@@ -51,7 +51,7 @@ defmodule Bonfire.OpenID do
      %ResourceOwner{
        sub: id,
        # TODO include email, etc?
-       username: e(current_user, :character, :username, nil) || e(current_user, :email, nil),
+       username: e(current_user, :character, :username, nil) || e(current_account(current_user), :email, :email_address, nil),
        # TODO: are we recording last seen on login and/or when the user was last active?
        last_login_at:
          if(Types.is_uid?(id),
