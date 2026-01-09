@@ -264,8 +264,9 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # token_endpoint_jwt_auth_alg: nil, # associated to authentication methods, the algorithm to use along
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
-    |> Map.merge(params 
-        |> flood("input params for client")
+    |> Map.merge(
+      params
+      |> flood("input params for client")
     )
     # OAuth client_secret
     |> Map.put_new_lazy(:secret, fn -> SecureRandom.hex(64) end)
@@ -307,16 +308,17 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       client_id = generate_client_id()
 
       # NOTE: we store registration token in metadata since Boruta doesn't have a dedicated field
-      client_params = %{
-        id: client_id,
-        redirect_uris: validated_params["redirect_uris"],
-        supported_scopes: parse_scopes(validated_params["scope"]) || default_scopes(),
-        supported_grant_types: validated_params["grant_types"] || ["authorization_code"],
-        name: validated_params["client_name"] || "Dynamically Registered Client",
-        # Store registration token in metadata
-        metadata: %{"registration_access_token" => registration_access_token}
-      }
-      |> flood("create params for dynamic client")
+      client_params =
+        %{
+          id: client_id,
+          redirect_uris: validated_params["redirect_uris"],
+          supported_scopes: parse_scopes(validated_params["scope"]) || default_scopes(),
+          supported_grant_types: validated_params["grant_types"] || ["authorization_code"],
+          name: validated_params["client_name"] || "Dynamically Registered Client",
+          # Store registration token in metadata
+          metadata: %{"registration_access_token" => registration_access_token}
+        }
+        |> flood("create params for dynamic client")
 
       case new(client_params) do
         {:ok, client} ->

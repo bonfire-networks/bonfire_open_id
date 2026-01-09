@@ -51,7 +51,9 @@ defmodule Bonfire.OpenID do
      %ResourceOwner{
        sub: id,
        # TODO include email, etc?
-       username: e(current_user, :character, :username, nil) || e(current_account(current_user), :email, :email_address, nil),
+       username:
+         e(current_user, :character, :username, nil) ||
+           e(current_account(current_user), :email, :email_address, nil),
        # TODO: are we recording last seen on login and/or when the user was last active?
        last_login_at:
          if(Types.is_uid?(id),
