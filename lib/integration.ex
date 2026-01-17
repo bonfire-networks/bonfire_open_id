@@ -73,7 +73,8 @@ defmodule Bonfire.OpenID do
       {:ok, _account, _user} ->
         :ok
 
-      _ ->
+      e ->
+        error(e, "Could not authenticate user")
         error(resource_owner, l("Invalid email or password."))
     end
   end

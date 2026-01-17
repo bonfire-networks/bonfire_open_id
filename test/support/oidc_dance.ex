@@ -1,7 +1,8 @@
 defmodule Bonfire.OpenID.OIDCDance do
   # use Patch, only: []
+
   import ExUnit.Assertions
-  import Bonfire.OpenID.DanceCase
+  # import Bonfire.OpenID.DanceCase
 
   use Arrows
   import Untangle
@@ -377,13 +378,46 @@ defmodule Bonfire.OpenID.OIDCDance do
     })
   end
 
+  @doc """
+  Exchanges username and password for tokens using the password grant.
+  """
+  def exchange_password_for_tokens(
+        req,
+        token_endpoint,
+        client_id,
+        client_secret,
+        username,
+        password,
+        scope \\ "openid profile email offline_access"
+      ) do
+    Req.post(
+      req,
+      url: token_endpoint,
+      form:
+        [
+          grant_type: "password",
+          client_id: client_id,
+          client_secret: client_secret,
+          username: username,
+          password: password,
+          scope: scope
+        ]
+        |> flood("Password grant form")
+    )
+    |> flood("Password grant result")
+    |> case do
+      {:ok, %{status: 200, body: %{"access_token" => access_token}}} -> {:ok, access_token}
+      other -> error(other)
+    end
+  end
+
   # DRY: Perform dynamic registration - now accepts redirect_uri parameter
   def perform_dynamic_registration(req, registration_endpoint, redirect_uri) do
     registration_request = %{
       # Use the passed redirect_uri
       "redirect_uris" => [redirect_uri],
       "client_name" => "Dynamically Registered Test Client",
-      "grant_types" => ["authorization_code", "implicit"],
+      "grant_types" => ["authorization_code", "implicit", "password"],
       "response_types" => ["code", "id_token", "token", "id_token token"],
       "scope" => "openid profile email identity data:public",
       "application_type" => "web",
@@ -808,6 +842,8 @@ defmodule Bonfire.OpenID.OIDCDance do
         uri -> debug("Server supports #{endpoint} at: #{uri}")
       end
     end
+
+    {:ok, Map.merge(jwks_response.body, discovery_response.body)}
   end
 
   @doc """
@@ -1285,5 +1321,19 @@ defmodule Bonfire.OpenID.OIDCDance do
     verify_id_token_userinfo_consistency(id_token, instance, access_token)
 
     debug("JWKS and Userinfo flow test successful!")
+  end
+
+  @doc """
+  Wraps a function call and ensures Boruta.Config.repo() is synced with Config.repo() after the call.
+  Use for all Req.get/Req.post calls in tests to avoid global repo contamination.
+  """
+  def apply_with_repo_sync(fun) when is_function(fun, 0) do
+    result = fun.()
+
+    if Boruta.Config.repo() != Bonfire.Common.Config.repo() do
+      Bonfire.Common.Config.put([Boruta.Oauth, :repo], Bonfire.Common.Config.repo())
+    end
+
+    result
   end
 end
