@@ -24,9 +24,12 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   @doc "Callback called by Bonfire.UI.Common.redirect_to_previous_go when redirect back to /oauth/authorize after login. This extracts the query string and calls authorize/2 directly instead of redirecting back to this controller."
   def from_query_string(conn, query) do
     query_params =
-      Plug.Conn.Query.decode(query)
+      query
+      |> flood("from_query_string query")
+      |> Plug.Conn.Query.decode()
+      |> flood("from_query_string decoded")
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
-      |> flood()
+      |> flood("query_params from_query_string")
 
     authorize(%{conn | query_params: query_params}, query_params)
   end
@@ -57,7 +60,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     # |> Plug.Conn.put_status(303) # TODO? to support redirect after a POST
     |> redirect_to(
       AuthorizeResponse.redirect_to_url(response)
-      |> flood(),
+      |> flood("authorize_success redirect url"),
       type: :maybe_external
     )
   end

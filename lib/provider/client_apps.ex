@@ -569,7 +569,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   defp parse_scopes(_), do: nil
 
   # workaround for Boruta: If client_id is not a UUID, hash and encode as UUID, and store original.
-  def maybe_transform_client_id(params) do
+  def maybe_transform_client_id(params) when is_map(params) do
     case Map.get(params, "client_id") do
       nil ->
         params
