@@ -15,7 +15,8 @@ defmodule Bonfire.OpenID.RuntimeConfig do
 
     # offer an OAuth & OpenID provider
     config :boruta, Boruta.Oauth,
-      issuer: System.get_env("OAUTH_ISSUER", "https://bonfirenetworks.org"),
+      # NOTE: issuer should match your Bonfire instance URL
+      issuer: System.get_env("OAUTH_ISSUER") || Bonfire.Common.Config.__get__(:host),
       #  NOTE: deprecated 
       redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate}
 
