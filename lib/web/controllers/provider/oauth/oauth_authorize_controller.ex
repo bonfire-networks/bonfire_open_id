@@ -122,7 +122,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     conn
     |> put_session(
       :go,
-      url || current_path(conn)
+      url || current_path(conn, conn.query_params)
     )
   end
 

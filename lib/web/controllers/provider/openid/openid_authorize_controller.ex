@@ -123,7 +123,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     |> put_session(
       :go,
       url ||
-        current_path(conn)
+        current_path(conn, conn.query_params)
         |> String.replace(~r/prompt=(login|none)/, "")
         |> String.replace(~r/max_age=(\d+)/, "")
     )
@@ -205,7 +205,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     # NOTE: after successfully logged in, it should redirect to `get_session(conn, :go)`
     redirect_to(
       conn,
-      "#{Bonfire.Common.URIs.path(:login)}?#{URI.encode_query(%{"go" => go_after_url || current_path(conn)})}"
+      "#{Bonfire.Common.URIs.path(:login)}?#{URI.encode_query(%{"go" => go_after_url || current_path(conn, conn.query_params)})}"
     )
   end
 
