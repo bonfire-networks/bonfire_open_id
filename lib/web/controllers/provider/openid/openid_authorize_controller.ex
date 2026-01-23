@@ -90,11 +90,6 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
         conn,
         %Error{status: status, error: error, error_description: error_description}
       ) do
-    if error == :invalid_client do
-      repo().all(from Boruta.Ecto.Client, order_by: [desc: :updated_at])
-      |> IO.inspect(label: "Clients in DB in #{Config.repo()}")
-    end
-
     error(error, inspect(error_description))
     flood(conn)
 

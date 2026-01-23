@@ -11,23 +11,26 @@ defmodule Bonfire.OpenID.Web.OauthView do
           expires_in: expires_in,
           refresh_token: refresh_token,
           id_token: id_token
-        }
+        } = response
       }) do
-    Enum.filter(
-      %{
-        token_type: String.capitalize(token_type || "Bearer"),
-        access_token: access_token,
-        expires_in: expires_in,
-        refresh_token: refresh_token,
-        id_token: id_token
-      },
-      fn
-        {_key, nil} -> false
-        _ -> true
-      end
-    )
-    # |> Enum.into(%{created_at: System.os_time(:second)})
-    |> Enum.into(%{})
+    scope = response.token && response.token.scope
+
+    result =
+      Enum.filter(
+        %{
+          token_type: String.capitalize(token_type || "Bearer"),
+          access_token: access_token,
+          expires_in: expires_in,
+          refresh_token: refresh_token,
+          id_token: id_token,
+          scope: scope
+        },
+        fn
+          {_key, nil} -> false
+          _ -> true
+        end
+      )
+      |> Enum.into(%{created_at: System.os_time(:second)})
   end
 
   def render("introspect.json", %{
