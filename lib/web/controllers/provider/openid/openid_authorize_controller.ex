@@ -122,10 +122,10 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     conn
     |> put_session(
       :go,
-      url ||
-        current_path(conn, conn.query_params)
-        |> String.replace(~r/prompt=(login|none)/, "")
-        |> String.replace(~r/max_age=(\d+)/, "")
+      (url ||
+         current_path(conn, conn.query_params))
+      |> String.replace(~r/prompt=(login|none)/, "")
+      |> String.replace(~r/max_age=(\d+)/, "")
     )
   end
 
