@@ -18,7 +18,15 @@ defmodule Bonfire.OpenID.RuntimeConfig do
       # NOTE: issuer should match your Bonfire instance URL
       issuer: System.get_env("OAUTH_ISSUER") || Bonfire.Common.Config.__get__(:host),
       #  NOTE: deprecated 
-      redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate}
+      redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate},
+      max_ttl: [
+        authorization_code: System.get_env("OAUTH_AUTHORIZATION_CODE_MAX_TTL", "60") |> String.to_integer(),
+        authorization_request: System.get_env("OAUTH_AUTHORIZATION_REQUEST_MAX_TTL", "60") |> String.to_integer(),
+        access_token: System.get_env("OAUTH_ACCESS_TOKEN_MAX_TTL", "#{60 * 60 * 24}") |> String.to_integer(),
+        agent_token: System.get_env("OAUTH_AGENT_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 30}") |> String.to_integer(),
+        id_token: System.get_env("OAUTH_ID_TOKEN_MAX_TTL", "#{60 * 60 * 24}") |> String.to_integer(),
+        refresh_token: System.get_env("OAUTH_REFRESH_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 30}") |> String.to_integer()
+      ]
 
     # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082 
 
