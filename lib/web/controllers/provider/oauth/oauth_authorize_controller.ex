@@ -13,7 +13,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
   def authorize(%Plug.Conn{} = conn, params) do
     current_user = current_user(conn) || current_account(conn)
-    conn = store_user_return_to(conn, params)
+    conn = store_user_return_to(conn)
 
     authorize_response(
       conn,
