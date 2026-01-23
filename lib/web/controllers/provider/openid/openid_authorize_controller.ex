@@ -12,8 +12,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   def oauth_module,
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
-  def authorize(%Plug.Conn{} = conn, _params) do
-    conn = store_user_return_to(conn)
+  def authorize(%Plug.Conn{} = conn, params) do
+    conn = store_user_return_to(conn, params)
     # |> put_unsigned_request()
 
     # Map.get(conn, :query_params)
