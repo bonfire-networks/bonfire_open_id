@@ -5,13 +5,14 @@ defmodule Bonfire.OpenID.Web.OauthView do
   alias Boruta.Oauth.TokenResponse
 
   def render("token.json", %{
-        response: %TokenResponse{
-          token_type: token_type,
-          access_token: access_token,
-          expires_in: expires_in,
-          refresh_token: refresh_token,
-          id_token: id_token
-        } = response
+        response:
+          %TokenResponse{
+            token_type: token_type,
+            access_token: access_token,
+            expires_in: expires_in,
+            refresh_token: refresh_token,
+            id_token: id_token
+          } = response
       }) do
     scope = response.token && response.token.scope
 
