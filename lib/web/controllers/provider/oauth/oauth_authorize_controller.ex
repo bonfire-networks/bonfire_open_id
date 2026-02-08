@@ -11,14 +11,38 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   def oauth_module,
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
-  def authorize(%Plug.Conn{} = conn, _params) do
-    current_user = current_user(conn) || current_account(conn)
+  def authorize(%Plug.Conn{} = conn, params) do
+    current_account = current_account(conn)
+    current_user = current_user(conn) || current_account
     conn = store_user_return_to(conn)
 
-    authorize_response(
-      conn,
-      current_user
-    )
+    login_hint = params["login_hint"]
+
+    if current_user && !login_hint_matches?(current_user, login_hint) do
+      # login_hint doesn't match the current session user, redirect towhere user can pick a profile
+      # if login_hint do 
+      # Users.by_account!(current_account, exclude_user_id: Enums.id(current_user))
+      # TODO iteration on user profiles and try to find a match with login_hint before redirecting to pick profile
+      # else
+      redirect_to_pick_profile(conn)
+      # end
+    else
+      authorize_response(
+        conn,
+        current_user
+      )
+    end
+  end
+
+  defp login_hint_matches?(_current_user, nil), do: true
+  defp login_hint_matches?(_current_user, ""), do: true
+
+  defp login_hint_matches?(current_user, login_hint) do
+    case Bonfire.Me.Characters.display_username(current_user, true, true) do
+      "@" <> current_username -> current_username == login_hint
+      current_username when is_binary(current_username) -> current_username == login_hint
+      _ -> false
+    end
   end
 
   @doc "Callback called by Bonfire.UI.Common.redirect_to_previous_go when redirect back to /oauth/authorize after login. This extracts the query string and calls authorize/2 directly instead of redirecting back to this controller."
@@ -102,6 +126,22 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
   def authorize_error(
         conn,
+        %Error{
+          status: status,
+          error: :invalid_client = error,
+          error_description: error_description
+        }
+      ) do
+    error(conn.query_params, inspect(error))
+
+    conn
+    |> put_status(status)
+    |> put_view(OauthView)
+    |> render("error.html", error: error, error_description: error_description)
+  end
+
+  def authorize_error(
+        conn,
         %Error{status: status, error: error, error_description: error_description}
       ) do
     error(error, inspect(error_description))
@@ -123,6 +163,15 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     |> put_session(
       :go,
       url || current_path(conn, conn.query_params)
+    )
+  end
+
+  def redirect_to_pick_profile(conn, go_after_url \\ nil) do
+    # where to redirect in order for the user to login
+    # NOTE: after successfully logged in, it should redirect to `get_session(conn, :go)`
+    redirect_to(
+      conn,
+      "#{Bonfire.Common.URIs.path(:switch_user)}?context=openid&#{URI.encode_query(%{"go" => go_after_url || current_path(conn, conn.query_params)})}"
     )
   end
 
