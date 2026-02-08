@@ -19,7 +19,11 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     login_hint = params["login_hint"]
 
     if current_user && !login_hint_matches?(current_user, login_hint) do
-      # login_hint doesn't match the current session user, redirect towhere user can pick a profile
+      flood(
+        login_hint,
+        "login_hint doesn't match the current session user, redirecting to pick profile"
+      )
+
       # if login_hint do 
       # Users.by_account!(current_account, exclude_user_id: Enums.id(current_user))
       # TODO iteration on user profiles and try to find a match with login_hint before redirecting to pick profile
@@ -37,13 +41,17 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   defp login_hint_matches?(_current_user, nil), do: true
   defp login_hint_matches?(_current_user, ""), do: true
 
-  defp login_hint_matches?(current_user, login_hint) do
+  defp login_hint_matches?(current_user, login_hint) when is_binary(login_hint) do
     case Bonfire.Me.Characters.display_username(current_user, true, true) do
       "@" <> current_username -> current_username == login_hint
+      "@" <> _ = current_username -> current_username == login_hint
+      "@" <> _ = current_username -> current_username == "@" <> login_hint
       current_username when is_binary(current_username) -> current_username == login_hint
       _ -> false
     end
   end
+
+  defp login_hint_matches?(_current_user, _), do: true
 
   @doc "Callback called by Bonfire.UI.Common.redirect_to_previous_go when redirect back to /oauth/authorize after login. This extracts the query string and calls authorize/2 directly instead of redirecting back to this controller."
   def from_query_string(conn, query) do
