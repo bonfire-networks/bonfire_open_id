@@ -14,14 +14,20 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
   def maybe_load_authorization(conn, opts \\ []) do
     with [authorization_header] <- get_req_header(conn, "authorization"),
          [_authorization_header, bearer] <- Regex.run(~r/[B|b]earer (.+)/, authorization_header),
-         {:ok, token} <- AccessToken.authorize(value: bearer),
-         %{} = user <-
-           Bonfire.Me.Users.get_current(token.sub) || error(token, "No user found") do
-      conn
-      # |> assign(:current_bearer_token, bearer)
-      |> assign(:current_token, token)
-      |> assign(:current_user, user)
-      |> assign(:user_email_confirmed?, email_confirmed?(user))
+         {:ok, token} <- AccessToken.authorize(value: bearer) do
+      # Always assign the token (works for app-only/client_credentials tokens too)
+      conn = assign(conn, :current_token, token)
+
+      # Optionally load the user if the token has a subject
+      case token.sub && Bonfire.Me.Users.get_current(token.sub) do
+        %{} = user ->
+          conn
+          |> assign(:current_user, user)
+          |> assign(:user_email_confirmed?, email_confirmed?(user))
+
+        _ ->
+          conn
+      end
     else
       {:error, reason} ->
         flood(reason, "Could not load or verify Bearer authorization")

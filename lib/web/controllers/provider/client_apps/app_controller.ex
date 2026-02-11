@@ -26,7 +26,6 @@ defmodule Bonfire.API.MastoCompatible.AppController do
         "redirect_uri" => List.first(client.redirect_uris || []),
         "client_id" => client.id,
         "client_secret" => client.secret
-        # "vapid_key"=> client.vapid_key # TODO?
       })
     else
       other ->
@@ -39,6 +38,27 @@ defmodule Bonfire.API.MastoCompatible.AppController do
           error: "Could not create a client",
           error_description: inspect(other)
         )
+    end
+  end
+
+  def verify_credentials(conn, _params) do
+    case conn.assigns[:current_token] do
+      %{client: %{} = client} = token ->
+        scopes = (token.scope || "") |> String.split(" ", trim: true)
+
+        json(conn, %{
+          "id" => client.id,
+          "name" => client.name,
+          "website" => nil,
+          "scopes" => scopes,
+          "redirect_uris" => client.redirect_uris || [],
+          "redirect_uri" => List.first(client.redirect_uris || [])
+        })
+
+      _ ->
+        conn
+        |> put_status(401)
+        |> json(%{"error" => "The access token is invalid"})
     end
   end
 end
