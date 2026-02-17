@@ -12,6 +12,9 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, params) do
+    conn = ensure_offline_access(conn)
+    params = ensure_offline_access_in_scope(params)
+
     current_account = current_account(conn)
     current_user = current_user(conn) || current_account
     conn = store_user_return_to(conn)
@@ -165,6 +168,26 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
   @impl Boruta.Oauth.AuthorizeApplication
   def preauthorize_error(_conn, _response), do: :ok
+
+  defp ensure_offline_access(%Plug.Conn{} = conn) do
+    query_params = Map.update(conn.query_params, "scope", "offline_access", &add_offline_access/1)
+    params = Map.update(conn.params, "scope", "offline_access", &add_offline_access/1)
+    %{conn | query_params: query_params, params: params}
+  end
+
+  defp ensure_offline_access_in_scope(params) when is_map(params) do
+    Map.update(params, "scope", "offline_access", &add_offline_access/1)
+  end
+
+  defp ensure_offline_access_in_scope(params), do: params
+
+  defp add_offline_access(scope) when is_binary(scope) do
+    if String.contains?(scope, "offline_access"),
+      do: scope,
+      else: scope <> " offline_access"
+  end
+
+  defp add_offline_access(scope), do: scope
 
   defp store_user_return_to(conn, url \\ nil) do
     conn
