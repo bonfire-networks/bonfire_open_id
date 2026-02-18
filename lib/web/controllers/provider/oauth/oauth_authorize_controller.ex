@@ -41,17 +41,29 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     end
   end
 
+  # Normalize a login_hint or display_username to a bare local username,
+  # stripping leading "@" and the instance domain (but preserving external emails)
+  defp normalize_login_hint("@" <> rest), do: normalize_login_hint(rest)
+
+  defp normalize_login_hint(username) when is_binary(username) and username != "" do
+    case String.split(username, "@", parts: 2) do
+      [nick_only, domain] ->
+        if domain == Bonfire.Common.URIs.base_domain(), do: nick_only, else: username
+
+      _ ->
+        username
+    end
+  end
+
+  defp normalize_login_hint(_), do: nil
+
   defp login_hint_matches?(_current_user, nil), do: true
   defp login_hint_matches?(_current_user, ""), do: true
 
   defp login_hint_matches?(current_user, login_hint) when is_binary(login_hint) do
-    case Bonfire.Me.Characters.display_username(current_user, true, true) do
-      "@" <> current_username -> current_username == login_hint
-      "@" <> _ = current_username -> current_username == login_hint
-      "@" <> _ = current_username -> current_username == "@" <> login_hint
-      current_username when is_binary(current_username) -> current_username == login_hint
-      _ -> false
-    end
+    # TODO: also check user account's email if the login_hint looks like an email?
+    Bonfire.Me.Characters.display_username(current_user, false, true, "") ==
+      normalize_login_hint(login_hint)
   end
 
   defp login_hint_matches?(_current_user, _), do: true
@@ -206,6 +218,19 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     )
   end
 
-  defdelegate redirect_to_login(conn, go_after_url \\ nil),
-    to: Bonfire.OpenID.Web.Openid.AuthorizeController
+  def redirect_to_login(conn, go_after_url \\ nil) do
+    query =
+      %{"go" => go_after_url || current_path(conn, conn.query_params)}
+
+    query =
+      case normalize_login_hint(conn.params["login_hint"]) do
+        nil -> query
+        hint -> Map.put(query, "email_or_username", hint)
+      end
+
+    redirect_to(
+      conn,
+      "#{Bonfire.Common.URIs.path(:login)}?#{URI.encode_query(query)}"
+    )
+  end
 end
