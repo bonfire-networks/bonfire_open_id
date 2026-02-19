@@ -23,7 +23,6 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
         %{} = user ->
           conn
           |> assign(:current_user, user)
-          |> assign(:user_email_confirmed?, email_confirmed?(user))
 
         _ ->
           conn
@@ -68,17 +67,5 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
     current_scopes = Scope.split(conn.assigns[:current_token].scope)
 
     Enum.empty?(List.wrap(required_scopes) -- current_scopes)
-  end
-
-  defp email_confirmed?(user) do
-    with account_id when is_binary(account_id) <-
-           e(user, :account, :id, nil) || e(user, :accounted, :account_id, nil),
-         %{email: %{confirmed_at: confirmed_at}} when not is_nil(confirmed_at) <-
-           Bonfire.Me.Accounts.Queries.login_by_account_id(account_id)
-           |> Bonfire.Common.Repo.maybe_one() do
-      true
-    else
-      _ -> false
-    end
   end
 end
