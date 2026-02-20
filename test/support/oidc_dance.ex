@@ -203,7 +203,7 @@ defmodule Bonfire.OpenID.OIDCDance do
       case opts.flow_type do
         :authorization_code_pkce ->
           # Get code verifier from context (stored during auth URL generation)
-          code_verifier = Process.get(:pkce_code_verifier)
+          code_verifier = ProcessTree.get(:pkce_code_verifier)
 
           exchange_code_for_tokens_pkce(
             discovery_document_uri,
