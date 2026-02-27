@@ -21,52 +21,59 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
     login_hint = params["login_hint"]
 
-    if current_user && !login_hint_matches?(current_user, login_hint) do
-      flood(
-        login_hint,
-        "login_hint doesn't match the current session user, redirecting to pick profile"
-      )
+    cond do
+      is_nil(current_user) ->
+        authorize_response(conn, nil)
 
-      # if login_hint do 
-      # Users.by_account!(current_account, exclude_user_id: Enums.id(current_user))
-      # TODO iteration on user profiles and try to find a match with login_hint before redirecting to pick profile
-      # else
-      redirect_to_pick_profile(conn)
-      # end
-    else
-      authorize_response(
-        conn,
-        current_user
-      )
+      login_hint_matches?(current_user, login_hint) ->
+        authorize_response(conn, current_user)
+
+      true ->
+        # login_hint doesn't match current user/account, try to find a
+        # matching profile in the account before redirecting to pick profile
+        case find_matching_user(current_account, login_hint) do
+          {:ok, matching_user} ->
+            authorize_response(conn, matching_user)
+
+          _ ->
+            flood(
+              login_hint,
+              "login_hint doesn't match any user in account, redirecting to pick profile"
+            )
+
+            redirect_to_pick_profile(conn)
+        end
     end
   end
-
-  # Normalize a login_hint or display_username to a bare local username,
-  # stripping leading "@" and the instance domain (but preserving external emails)
-  defp normalize_login_hint("@" <> rest), do: normalize_login_hint(rest)
-
-  defp normalize_login_hint(username) when is_binary(username) and username != "" do
-    case String.split(username, "@", parts: 2) do
-      [nick_only, domain] ->
-        if domain == Bonfire.Common.URIs.base_domain(), do: nick_only, else: username
-
-      _ ->
-        username
-    end
-  end
-
-  defp normalize_login_hint(_), do: nil
 
   defp login_hint_matches?(_current_user, nil), do: true
   defp login_hint_matches?(_current_user, ""), do: true
 
   defp login_hint_matches?(current_user, login_hint) when is_binary(login_hint) do
-    # TODO: also check user account's email if the login_hint looks like an email?
-    Bonfire.Me.Characters.display_username(current_user, false, true, "") ==
+    String.downcase(Bonfire.Me.Characters.display_username(current_user, false, true, "") || "") ==
       normalize_login_hint(login_hint)
   end
 
   defp login_hint_matches?(_current_user, _), do: true
+
+  # Try to find a user in the account whose username matches the login_hint
+  defp find_matching_user(current_account, login_hint) when is_binary(login_hint) do
+    with username when is_binary(username) <- normalize_login_hint(login_hint),
+         account_id when not is_nil(account_id) <- Bonfire.Common.Enums.id(current_account) do
+      Bonfire.Me.Users.by_user_and_account(username, account_id)
+    end
+  end
+
+  defp find_matching_user(_, _), do: nil
+
+  # Extract bare downcased username from a login_hint like "@Alice@host:port"
+  defp normalize_login_hint("@" <> rest), do: normalize_login_hint(rest)
+
+  defp normalize_login_hint(username) when is_binary(username) and username != "" do
+    username |> String.split("@") |> List.first() |> String.downcase()
+  end
+
+  defp normalize_login_hint(_), do: nil
 
   @doc "Callback called by Bonfire.UI.Common.redirect_to_previous_go when redirect back to /oauth/authorize after login. This extracts the query string and calls authorize/2 directly instead of redirecting back to this controller."
   def from_query_string(conn, query) do
