@@ -15,26 +15,15 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
     with [authorization_header] <- get_req_header(conn, "authorization"),
          [_authorization_header, bearer] <- Regex.run(~r/[B|b]earer (.+)/, authorization_header),
          {:ok, token} <- AccessToken.authorize(value: bearer) do
-      # Always assign the token (works for app-only/client_credentials tokens too)
-      conn = assign(conn, :current_token, token)
-
-      # Optionally load the user if the token has a subject
-      case token.sub && Bonfire.Me.Users.get_current(token.sub) do
-        %{} = user ->
-          conn
-          |> assign(:current_user, user)
-
-        _ ->
-          conn
-      end
+      load_token_user(conn, token)
     else
       {:error, reason} ->
         flood(reason, "Could not load or verify Bearer authorization")
         nil
 
       [] ->
-        flood("Could not find Bearer authorization")
-        nil
+        # No Authorization header - try access_token query param (used by SSE/streaming clients)
+        maybe_load_from_query_param(conn)
 
       other when is_list(other) ->
         flood("Could not find valid Bearer authorization")
@@ -44,6 +33,26 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
         flood(other, "Could not load authorization")
         nil
     end || maybe_fallback_load_authorization(conn, opts)
+  end
+
+  defp load_token_user(conn, token) do
+    # Always assign the token (works for app-only/client_credentials tokens too)
+    conn = assign(conn, :current_token, token)
+
+    # Optionally load the user if the token has a subject
+    case token.sub && Bonfire.Me.Users.get_current(token.sub) do
+      %{} = user -> assign(conn, :current_user, user)
+      _ -> conn
+    end
+  end
+
+  defp maybe_load_from_query_param(conn) do
+    with access_token when is_binary(access_token) <- conn.params["access_token"],
+         {:ok, token} <- AccessToken.authorize(value: access_token) do
+      load_token_user(conn, token)
+    else
+      _ -> nil
+    end
   end
 
   defp maybe_fallback_load_authorization(conn, opts) do
