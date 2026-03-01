@@ -7,7 +7,7 @@ defmodule Bonfire.OpenID.Plugs.AuthRequired do
       conn
     else
       other ->
-        flood(other, "Auth required plug failed to load authorization")
+        debug(other, "Auth required plug failed to load authorization")
         raise Bonfire.Fail, :needs_login
     end
   end

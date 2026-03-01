@@ -287,7 +287,7 @@ defmodule Bonfire.OpenID.OAuthDance do
     # Fetch authorization page (might redirect)
     {:ok, response} =
       apply_with_repo_sync(fn -> Req.get(req, url: auth_url, redirect: false) end)
-      |> flood("Initial GET auth_url response from #{auth_url}")
+      |> debug("Initial GET auth_url response from #{auth_url}")
 
     # Handle redirect to actual authorization URL
     actual_auth_url =
@@ -296,7 +296,7 @@ defmodule Bonfire.OpenID.OAuthDance do
         303 -> response.headers["location"] |> List.first()
         _ -> raise "Expected redirect to authorization URL, got status #{response.status}"
       end
-      |> flood("Actual Auth URL (should be on provider)")
+      |> debug("Actual Auth URL (should be on provider)")
 
     # Parse actual_auth_url to get the correct base URL for login POST
     uri = URI.parse(actual_auth_url)

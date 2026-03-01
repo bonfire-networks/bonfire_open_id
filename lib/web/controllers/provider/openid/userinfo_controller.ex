@@ -20,7 +20,7 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
                type: :access_token,
                scope: nil
              })
-             |> flood("basic userinfo"),
+             |> debug("basic userinfo"),
            %{} = client <- Bonfire.OpenID.Provider.ClientApps.init_test_client_app() do
         userinfo_fetched(
           conn,
@@ -28,7 +28,7 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
             userinfo,
             client |> Boruta.Ecto.OauthMapper.to_oauth_schema()
           )
-          |> flood("from_userinfo")
+          |> debug("from_userinfo")
         )
       end
     else
@@ -39,7 +39,7 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
 
   @impl Boruta.Openid.UserinfoApplication
   def userinfo_fetched(conn, userinfo_response) do
-    flood(userinfo_response, "userinfo_fetched")
+    debug(userinfo_response, "userinfo_fetched")
 
     if userinfo_response.format == :jwt do
       # Send raw JWT with correct content-type, no JSON encoding

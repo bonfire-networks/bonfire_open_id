@@ -35,7 +35,7 @@ defmodule Bonfire.OpenID.OAuthCodeDanceTest do
     # Get tokens using DRY helper
     auth_url =
       get_auth_url(client.name)
-      |> flood("Auth URL")
+      |> debug("Auth URL")
 
     req = create_req_client(main_instance)
     login_response = perform_login_flow(req, auth_url, context)

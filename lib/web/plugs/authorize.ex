@@ -18,7 +18,7 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
       load_token_user(conn, token)
     else
       {:error, reason} ->
-        flood(reason, "Could not load or verify Bearer authorization")
+        debug(reason, "Could not load or verify Bearer authorization")
         nil
 
       [] ->
@@ -26,11 +26,11 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
         maybe_load_from_query_param(conn)
 
       other when is_list(other) ->
-        flood("Could not find valid Bearer authorization")
+        debug("Could not find valid Bearer authorization")
         nil
 
       other ->
-        flood(other, "Could not load authorization")
+        debug(other, "Could not load authorization")
         nil
     end || maybe_fallback_load_authorization(conn, opts)
   end
@@ -67,7 +67,7 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
         conn
 
       false ->
-        flood(required_scopes, "Authorize plug failed to validate scopes")
+        debug(required_scopes, "Authorize plug failed to validate scopes")
         raise Bonfire.Fail, :unauthorized
     end
   end

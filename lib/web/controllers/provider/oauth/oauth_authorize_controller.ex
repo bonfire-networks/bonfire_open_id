@@ -36,7 +36,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
             authorize_response(conn, matching_user)
 
           _ ->
-            flood(
+            debug(
               login_hint,
               "login_hint doesn't match any user in account, redirecting to pick profile"
             )
@@ -79,11 +79,11 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   def from_query_string(conn, query) do
     query_params =
       query
-      |> flood("from_query_string query")
+      |> debug("from_query_string query")
       |> Plug.Conn.Query.decode()
-      |> flood("from_query_string decoded")
+      |> debug("from_query_string decoded")
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
-      |> flood("query_params from_query_string")
+      |> debug("query_params from_query_string")
 
     authorize(%{conn | query_params: query_params, params: query_params}, query_params)
   end
@@ -114,7 +114,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     # |> Plug.Conn.put_status(303) # TODO? to support redirect after a POST
     |> redirect_to(
       AuthorizeResponse.redirect_to_url(response)
-      |> flood("authorize_success redirect url"),
+      |> debug("authorize_success redirect url"),
       type: :maybe_external
     )
   end

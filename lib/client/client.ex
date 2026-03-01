@@ -16,7 +16,7 @@ defmodule Bonfire.OpenID.Client do
 
   def oauth2_providers do
     Config.get([:bonfire_open_id, :oauth2_providers], [])
-    |> flood("Fetched OAuth2 providers in #{Config.repo()}")
+    |> debug("Fetched OAuth2 providers in #{Config.repo()}")
     |> Enum.map(fn {provider, config} ->
       {provider, config |> Enum.into(%{redirect_uri: provider_url(provider, :oauth)})}
     end)

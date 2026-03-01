@@ -251,7 +251,7 @@ defmodule Bonfire.OpenID.OIDCDance do
       ) do
     {:ok, discovery_response} =
       apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
-      |> flood("fetched discovery document for PKCE token exchange")
+      |> debug("fetched discovery document for PKCE token exchange")
 
     token_endpoint = discovery_response.body["token_endpoint"]
 
@@ -330,7 +330,7 @@ defmodule Bonfire.OpenID.OIDCDance do
   def exchange_code_for_tokens(discovery_document_uri, req, client, auth_code, redirect_uri) do
     {:ok, discovery_response} =
       apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
-      |> flood("fetched discovery document")
+      |> debug("fetched discovery document")
 
     token_endpoint = discovery_response.body["token_endpoint"]
 
@@ -402,9 +402,9 @@ defmodule Bonfire.OpenID.OIDCDance do
           password: password,
           scope: scope
         ]
-        |> flood("Password grant form")
+        |> debug("Password grant form")
     )
-    |> flood("Password grant result")
+    |> debug("Password grant result")
     |> case do
       {:ok, %{status: 200, body: %{"access_token" => access_token}}} -> {:ok, access_token}
       other -> error(other)
@@ -499,7 +499,7 @@ defmodule Bonfire.OpenID.OIDCDance do
     # Exchange code for tokens using the same redirect_uri
     {:ok, discovery_response} =
       apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
-      |> flood("fetched discovery document for dynamic client token exchange")
+      |> debug("fetched discovery document for dynamic client token exchange")
 
     token_endpoint = discovery_response.body["token_endpoint"]
 
@@ -541,7 +541,7 @@ defmodule Bonfire.OpenID.OIDCDance do
   def get_registration_endpoint(discovery_document_uri) do
     {:ok, discovery_response} =
       apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
-      |> flood("fetched discovery document")
+      |> debug("fetched discovery document")
 
     case discovery_response.body["registration_endpoint"] do
       nil -> :not_supported
@@ -803,7 +803,7 @@ defmodule Bonfire.OpenID.OIDCDance do
   def verify_discovery_document(discovery_document_uri, instance) do
     {:ok, discovery_response} =
       apply_with_repo_sync(fn -> Req.get(discovery_document_uri) end)
-      |> flood("fetched discovery document")
+      |> debug("fetched discovery document")
 
     assert %{
              "issuer" => ^instance,
@@ -1042,23 +1042,23 @@ defmodule Bonfire.OpenID.OIDCDance do
     # Extract JWT header to get kid
     [header_b64, payload_b64, signature_b64] =
       String.split(jwt, ".")
-      |> flood("Splitting JWT into parts")
+      |> debug("Splitting JWT into parts")
 
     header =
       header_b64
       |> add_base64_padding()
       |> Base.decode64!()
       |> Jason.decode!()
-      |> flood("Decoded JWT header")
+      |> debug("Decoded JWT header")
 
     Enum.map(jwks_keys, & &1["kid"])
-    |> flood("Available JWKS kids")
+    |> debug("Available JWKS kids")
 
     Enum.map(jwks_keys, & &1["x5t"])
-    |> flood("Available JWKS x5t")
+    |> debug("Available JWKS x5t")
 
     Enum.map(jwks_keys, & &1["x5t#S256"])
-    |> flood("Available JWKS x5t#S256")
+    |> debug("Available JWKS x5t#S256")
 
     kid = header["kid"]
 
@@ -1086,15 +1086,15 @@ defmodule Bonfire.OpenID.OIDCDance do
 
     case matching_key do
       nil when is_nil(kid) ->
-        flood("No kid in JWT header (or normalized empty), trying all available keys")
+        debug("No kid in JWT header (or normalized empty), trying all available keys")
         verify_with_all_keys(jwt, jwks_keys, [])
 
       nil ->
-        flood(kid, "JWT kid present but no direct match in JWKS; trying all available keys")
+        debug(kid, "JWT kid present but no direct match in JWKS; trying all available keys")
         verify_with_all_keys(jwt, jwks_keys, [])
 
       matching_key ->
-        flood(
+        debug(
           matching_key["kid"] || "matched_via_x5t",
           "Found matching JWKS key, verifying signature"
         )
@@ -1128,15 +1128,15 @@ defmodule Bonfire.OpenID.OIDCDance do
         {true, jwt_struct, _} ->
           # Signature valid, extract claims
           jwt_struct.fields
-          |> flood("JWT signature verified successfully")
+          |> debug("JWT signature verified successfully")
 
         {false, _jwt_struct, _} ->
-          flood("Signature invalid with this key")
+          debug("Signature invalid with this key")
           {:error, {:signature_invalid, attempted_kids}}
       end
     rescue
       e ->
-        flood(e, "Error verifying JWT with key")
+        debug(e, "Error verifying JWT with key")
         {:error, {:verification_failed, attempted_kids}}
     end
   end
@@ -1159,12 +1159,12 @@ defmodule Bonfire.OpenID.OIDCDance do
     case verify_jwt_with_key(jwt, key, [kid | attempted_kids]) do
       {:error, _reason} ->
         # This key didn't work, try next one
-        flood(kid, "JWT signature verification failed with this key, trying next")
+        debug(kid, "JWT signature verification failed with this key, trying next")
         verify_with_all_keys(jwt, remaining_keys, [kid | attempted_kids])
 
       claims when is_map(claims) ->
         # Success! Return claims
-        flood(kid, "JWT signature verification worked with this key")
+        debug(kid, "JWT signature verification worked with this key")
         claims
     end
   end
