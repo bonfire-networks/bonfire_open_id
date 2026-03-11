@@ -19,13 +19,17 @@ defmodule Bonfire.OpenID.RuntimeConfig do
       issuer: System.get_env("OAUTH_ISSUER") || Bonfire.Common.Config.__get__(:host),
       #  NOTE: deprecated 
       redirect_uri_validation_fun: {Bonfire.OpenID.Provider.OAuth, :redirect_uri_validate},
+      contexts: [
+        access_tokens: Bonfire.OpenID.Provider.AccessTokens
+      ],
       max_ttl: [
         authorization_code:
           System.get_env("OAUTH_AUTHORIZATION_CODE_MAX_TTL", "60") |> String.to_integer(),
         authorization_request:
           System.get_env("OAUTH_AUTHORIZATION_REQUEST_MAX_TTL", "60") |> String.to_integer(),
         access_token:
-          System.get_env("OAUTH_ACCESS_TOKEN_MAX_TTL", "#{60 * 60 * 24}") |> String.to_integer(),
+          System.get_env("OAUTH_ACCESS_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 365}")
+          |> String.to_integer(),
         agent_token:
           System.get_env("OAUTH_AGENT_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 30}")
           |> String.to_integer(),
