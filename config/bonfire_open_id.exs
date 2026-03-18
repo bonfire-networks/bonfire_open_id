@@ -3,7 +3,7 @@ import Config
 test_instance = System.get_env("TEST_INSTANCE")
 
 yes? = ~w(true yes 1)
-# no? = ~w(false no 0)
+# no? = ~w(false no none 0)
 
 config :bonfire_open_id,
   templates_path: "lib"
