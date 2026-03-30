@@ -40,9 +40,13 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
     conn = assign(conn, :current_token, token)
 
     # Optionally load the user if the token has a subject
-    case token.sub && Bonfire.Me.Users.get_current(token.sub) do
-      %{} = user -> assign(conn, :current_user, user)
-      _ -> conn
+    if token.sub && Bonfire.Common.Cache.get!("force_logout:#{token.sub}") do
+      conn
+    else
+      case token.sub && Bonfire.Me.Users.get_current(token.sub) do
+        %{} = user -> assign(conn, :current_user, user)
+        _ -> conn
+      end
     end
   end
 
