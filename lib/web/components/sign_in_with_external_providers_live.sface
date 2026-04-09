@@ -27,7 +27,7 @@
                   <h3 class="text-lg font-bold">{l("What is ORCID ID?")}</h3>
                   <p class="py-4">{l(
                       "ORCID is a free, unique identifier for researchers that helps you save time when signing into systems. By authenticating with ORCID, we automatically collect your correct ORCID iD, preventing errors that can occur when manually typing identifiers. This ensures accurate attribution of your work and allows you to spend more time on research and less time managing it."
-                    )} <a class="link" href="https://orcid.org">{l("Learn more at orcid.org")}</a></p>
+                    )} <LinkLive class="link" to="https://orcid.org">{l("Learn more at orcid.org")}</LinkLive></p>
                   <div class="modal-action">
                     <form method="dialog" class="modal-action">
                       <button class="btn" type="submit">close</button>
