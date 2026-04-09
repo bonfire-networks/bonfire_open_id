@@ -229,8 +229,14 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
     query =
       %{"go" => go_after_url || current_path(conn, conn.query_params)}
 
+    login_hint =
+      case conn.params do
+        %Plug.Conn.Unfetched{} -> conn.query_params["login_hint"]
+        params -> params["login_hint"]
+      end
+
     query =
-      case normalize_login_hint(conn.params["login_hint"]) do
+      case normalize_login_hint(login_hint) do
         nil -> query
         hint -> Map.put(query, "email_or_username", hint)
       end
