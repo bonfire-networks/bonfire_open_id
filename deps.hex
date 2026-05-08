@@ -1,4 +1,4 @@
-faker = "~> 0.14" # fake data generation
+faker_fork = "~> 0.19" # fake data generation
 jason = "~> 1.0"
 boruta = "~> 3.0.0-beta.4" # openid / oauth provider
 nebulex_distributed = "~> 3.0" # Nebulex.Adapters.Replicated (required by boruta)
