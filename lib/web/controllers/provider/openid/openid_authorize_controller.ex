@@ -44,6 +44,17 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
       |> add_unsigned_request()
       |> debug("from_query_string transformed query_params")
 
+    info(Boruta.Config.repo(), "from_query_string: Boruta repo in use")
+    info(Bonfire.Common.Config.repo(), "from_query_string: Config repo in use")
+    info(query_params["client_id"], "from_query_string: client_id")
+    info(query_params["redirect_uri"], "from_query_string: redirect_uri")
+    info(query_params["response_type"], "from_query_string: response_type")
+    info(conn.assigns[:current_user], "from_query_string: current_user in conn")
+
+    # Check if client exists in Boruta repo
+    client_check = Bonfire.OpenID.Provider.ClientApps.get(id: query_params["client_id"])
+    info(client_check, "from_query_string: client lookup result")
+
     conn
     |> Map.put(:query_params, query_params)
     |> authorize(query_params)

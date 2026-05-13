@@ -29,7 +29,7 @@ defmodule Bonfire.OpenID.OIDCPKCEPublicClientDanceTest do
        } = context do
     # Create a public client (no client_secret)
     public_client_id = Faker.UUID.v4()
-    redirect_uri = "#{main_instance}/oauth/client/" <> public_client_id
+    redirect_uri = "#{main_instance}/openid/client/" <> public_client_id
 
     public_client =
       TestInstanceRepo.apply(fn ->
@@ -48,12 +48,15 @@ defmodule Bonfire.OpenID.OIDCPKCEPublicClientDanceTest do
       end)
 
     # Test PKCE flow with public client
-    test_oidc_flow(Map.put(context, :client, public_client), %{
-      response_type: "authorization_code",
-      scope: "openid identity data:public",
-      flow_type: :authorization_code_pkce,
-      client_name: "Public PKCE Client",
-      public_client: true
-    })
+    test_oidc_flow(
+      context |> Map.put(:client, public_client) |> Map.put(:redirect_uri, redirect_uri),
+      %{
+        response_type: "authorization_code",
+        scope: "openid identity data:public",
+        flow_type: :authorization_code_pkce,
+        client_name: "Public PKCE Client",
+        public_client: true
+      }
+    )
   end
 end

@@ -17,7 +17,7 @@ defmodule Bonfire.OpenID.OIDCDance do
     client_id = Faker.UUID.v4()
     main_instance = "http://localhost:4000"
     secondary_instance = "http://localhost:4002"
-    redirect_uri = "#{main_instance}/oauth/client/" <> client_id
+    redirect_uri = "#{main_instance}/openid/client/" <> client_id
     discovery_document_uri = "#{secondary_instance}/.well-known/openid-configuration"
 
     # Create client with OpenID Connect scopes
@@ -594,7 +594,7 @@ defmodule Bonfire.OpenID.OIDCDance do
       payload
       |> Base.decode64!()
       |> Jason.decode!()
-      |> debug("ID token claims")
+      |> info("ID token claims")
 
     # Verify standard OpenID Connect claims
     assert claims["iss"], "ID token should have issuer claim"
