@@ -41,20 +41,38 @@ defmodule Bonfire.OpenID.Web.Routes do
         pipe_through([:check_provider_enabled, :basic, :validate_client_id])
 
         post("/revoke", RevokeController, :revoke)
-        post("/token", TokenController, :token)
         post("/introspect", IntrospectController, :introspect)
+      end
+
+      # Token issuance — throttled (brute-force auth vector)
+      scope "/oauth", Bonfire.OpenID.Web.Oauth do
+        pipe_through([:check_provider_enabled, :basic, :validate_client_id, :throttle_forms])
+
+        post("/token", TokenController, :token)
       end
 
       scope "/oauth" do
         pipe_through([:check_provider_enabled, :basic, :load_authorization, :validate_client_id])
 
         get("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
-        post("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
         get("/ready", Bonfire.OpenID.Web.Oauth.ReadyController, :ready)
 
         # NOTE: points to OpenID userinfo endpoint instead
         get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
         post("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
+      end
+
+      # Authorize POST (consent submission) — throttled
+      scope "/oauth" do
+        pipe_through([
+          :check_provider_enabled,
+          :basic,
+          :load_authorization,
+          :validate_client_id,
+          :throttle_forms
+        ])
+
+        post("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
       end
 
       scope "/openid" do
@@ -64,10 +82,6 @@ defmodule Bonfire.OpenID.Web.Routes do
         get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
         post("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
         get("/jwks", Bonfire.OpenID.Web.Openid.JwksController, :jwks_index)
-        post("/token", Bonfire.OpenID.Web.Oauth.TokenController, :token)
-
-        # dynamic client registration routes
-        post "/register", Bonfire.OpenID.Web.Openid.ClientRegistrationController, :register
 
         get "/register/:client_id",
             Bonfire.OpenID.Web.Openid.ClientRegistrationController,
@@ -80,6 +94,14 @@ defmodule Bonfire.OpenID.Web.Routes do
         delete "/register/:client_id",
                Bonfire.OpenID.Web.Openid.ClientRegistrationController,
                :delete
+      end
+
+      # Token issuance and dynamic client registration — throttled
+      scope "/openid" do
+        pipe_through([:check_provider_enabled, :basic, :load_authorization, :throttle_forms])
+
+        post("/token", Bonfire.OpenID.Web.Oauth.TokenController, :token)
+        post("/register", Bonfire.OpenID.Web.Openid.ClientRegistrationController, :register)
       end
 
       scope "/.well-known", Bonfire.OpenID.Web.Openid do
