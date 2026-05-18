@@ -24,23 +24,49 @@ defmodule Bonfire.OpenID.RuntimeConfig do
       ],
       max_ttl: [
         authorization_code:
-          System.get_env("OAUTH_AUTHORIZATION_CODE_MAX_TTL", "60") |> String.to_integer(),
+          System.get_env(
+            "OAUTH_AUTHORIZATION_CODE_MAX_TTL",
+            "#{div(to_timeout(minute: 1), 1_000)}"
+          )
+          |> String.to_integer(),
         authorization_request:
-          System.get_env("OAUTH_AUTHORIZATION_REQUEST_MAX_TTL", "60") |> String.to_integer(),
+          System.get_env(
+            "OAUTH_AUTHORIZATION_REQUEST_MAX_TTL",
+            "#{div(to_timeout(minute: 1), 1_000)}"
+          )
+          |> String.to_integer(),
         access_token:
-          System.get_env("OAUTH_ACCESS_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 365}")
+          System.get_env("OAUTH_ACCESS_TOKEN_MAX_TTL", "#{div(to_timeout(day: 365), 1_000)}")
           |> String.to_integer(),
         agent_token:
-          System.get_env("OAUTH_AGENT_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 30}")
+          System.get_env("OAUTH_AGENT_TOKEN_MAX_TTL", "#{div(to_timeout(day: 30), 1_000)}")
           |> String.to_integer(),
         id_token:
-          System.get_env("OAUTH_ID_TOKEN_MAX_TTL", "#{60 * 60 * 24}") |> String.to_integer(),
+          System.get_env("OAUTH_ID_TOKEN_MAX_TTL", "#{div(to_timeout(day: 1), 1_000)}")
+          |> String.to_integer(),
         refresh_token:
-          System.get_env("OAUTH_REFRESH_TOKEN_MAX_TTL", "#{60 * 60 * 24 * 30}")
+          System.get_env("OAUTH_REFRESH_TOKEN_MAX_TTL", "#{div(to_timeout(day: 30), 1_000)}")
           |> String.to_integer()
       ]
 
-    # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082 
+    config :bonfire_open_id, Bonfire.OpenID.Provider.ClientApps,
+      access_token_ttl:
+        System.get_env("OAUTH_CLIENT_ACCESS_TOKEN_TTL", "#{div(to_timeout(day: 1), 1_000)}")
+        |> String.to_integer(),
+      authorization_code_ttl:
+        System.get_env(
+          "OAUTH_CLIENT_AUTHORIZATION_CODE_TTL",
+          "#{div(to_timeout(minute: 1), 1_000)}"
+        )
+        |> String.to_integer(),
+      refresh_token_ttl:
+        System.get_env("OAUTH_CLIENT_REFRESH_TOKEN_TTL", "#{div(to_timeout(day: 30), 1_000)}")
+        |> String.to_integer(),
+      id_token_ttl:
+        System.get_env("OAUTH_CLIENT_ID_TOKEN_TTL", "#{div(to_timeout(day: 1), 1_000)}")
+        |> String.to_integer()
+
+    # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082
 
     # connect as a client to an OpenID Connect provider https://yourinstance.tld/oauth/client/openid_1
     if main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY") do

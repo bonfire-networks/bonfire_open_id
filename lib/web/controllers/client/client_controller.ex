@@ -404,8 +404,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
     #        )}
   end
 
-  # 30 minutes
-  @token_ttl 30 * 60 * 1000
+  @token_ttl to_timeout(minute: 30)
 
   def token_put_cache(provider, data) do
     key = "openid_provider:#{provider}:#{Bonfire.Common.Text.random_string()}"

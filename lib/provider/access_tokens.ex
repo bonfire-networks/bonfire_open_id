@@ -7,7 +7,7 @@ defmodule Bonfire.OpenID.Provider.AccessTokens do
 
   @behaviour Boruta.Oauth.AccessTokens
 
-  @long_lived_ttl 60 * 60 * 24 * 365
+  @long_lived_ttl div(to_timeout(day: 365), 1_000)
 
   defdelegate get_by(params), to: Boruta.Ecto.AccessTokens
   defdelegate revoke(token), to: Boruta.Ecto.AccessTokens

@@ -217,14 +217,26 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       id: id,
       # Display name
       name: Map.get(params, :name) || params[:id] || "Client app",
-      # one day
-      access_token_ttl: 60 * 60 * 24,
-      # one minutes
-      authorization_code_ttl: 60,
-      # one month
-      refresh_token_ttl: 60 * 60 * 24 * 30,
-      # one day
-      id_token_ttl: 60 * 60 * 24,
+      access_token_ttl:
+        Bonfire.Common.Config.get(
+          [:bonfire_open_id, Bonfire.OpenID.Provider.ClientApps, :access_token_ttl],
+          div(to_timeout(day: 1), 1_000)
+        ),
+      authorization_code_ttl:
+        Bonfire.Common.Config.get(
+          [:bonfire_open_id, Bonfire.OpenID.Provider.ClientApps, :authorization_code_ttl],
+          div(to_timeout(minute: 1), 1_000)
+        ),
+      refresh_token_ttl:
+        Bonfire.Common.Config.get(
+          [:bonfire_open_id, Bonfire.OpenID.Provider.ClientApps, :refresh_token_ttl],
+          div(to_timeout(day: 30), 1_000)
+        ),
+      id_token_ttl:
+        Bonfire.Common.Config.get(
+          [:bonfire_open_id, Bonfire.OpenID.Provider.ClientApps, :id_token_ttl],
+          div(to_timeout(day: 1), 1_000)
+        ),
       # ID token signature algorithm, defaults to "RS512"
       id_token_signature_alg: "RS256",
       # userinfo signature algorithm, defaults to nil (no signature)
