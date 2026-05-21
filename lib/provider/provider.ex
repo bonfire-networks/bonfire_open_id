@@ -63,7 +63,11 @@ defmodule Bonfire.OpenID.Provider do
         "password",
         "client_credentials",
         "refresh_token"
-      ]
+      ],
+      # CIMD: clients may use their own HTTPS URL as client_id (no pre-registration needed)
+      "client_id_metadata_document_supported" => true,
+      # This instance's own CIMD URL, used when connecting to other servers as a client
+      "client_id" => Bonfire.OpenID.Client.cimd_client_id()
       # "ui_locales_supported" => ["en"]
     }
   end

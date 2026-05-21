@@ -79,4 +79,8 @@ defmodule Bonfire.OpenID.Web.OauthView do
   def render("oauth-authorization-server.json", _) do
     Bonfire.OpenID.Provider.oauth_authorization_server_data()
   end
+
+  def render("oauth-client.json", _) do
+    Bonfire.OpenID.Client.cimd_document()
+  end
 end

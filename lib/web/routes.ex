@@ -115,6 +115,12 @@ defmodule Bonfire.OpenID.Web.Routes do
 
         get("/oauth-authorization-server", IntrospectController, :oauth_metadata)
       end
+
+      scope "/.well-known", Bonfire.OpenID.Web.Oauth do
+        pipe_through([:basic])
+
+        get("/oauth-client", IntrospectController, :oauth_client_metadata)
+      end
     end
   end
 end

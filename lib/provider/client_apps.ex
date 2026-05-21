@@ -337,6 +337,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
           client_response = %{
             "client_id" => client.id,
             "client_secret" => client.secret,
+            # 0 means the secret does not expire (required by RFC 7591)
+            "client_secret_expires_at" => 0,
             "registration_access_token" => registration_access_token,
             "registration_client_uri" =>
               "#{Bonfire.Common.URIs.base_url()}/openid/register/#{client.id}",
@@ -389,6 +391,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
           client_config = %{
             "client_id" => updated_client.id,
             "client_secret" => updated_client.secret,
+            "client_secret_expires_at" => 0,
             "client_name" => updated_client.name,
             "redirect_uris" => updated_client.redirect_uris,
             "grant_types" => updated_client.supported_grant_types || ["authorization_code"],
@@ -415,6 +418,7 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
         client_config = %{
           "client_id" => client.id,
           "client_secret" => client.secret,
+          "client_secret_expires_at" => 0,
           "client_name" => client.name,
           "redirect_uris" => client.redirect_uris,
           "grant_types" => client.supported_grant_types || ["authorization_code"],

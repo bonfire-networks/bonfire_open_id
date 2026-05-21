@@ -7,6 +7,48 @@ defmodule Bonfire.OpenID.Client do
   alias Bonfire.Common.Utils
   alias Bonfire.Common.Types
 
+  @doc """
+  The CIMD client_id URL for this Bonfire instance.
+  Used as `client_id` when this instance acts as an OAuth client to other servers.
+  """
+  def cimd_client_id do
+    "#{Bonfire.Common.URIs.base_url()}/.well-known/oauth-client"
+  end
+
+  @doc """
+  All redirect URIs this instance may use as an OAuth client (across all configured providers).
+  """
+  def all_redirect_uris do
+    for type <- [:openid, :oauth],
+        {provider, _config} <-
+          if(type == :openid, do: open_id_connect_providers(), else: oauth2_providers()) do
+      provider_url(provider, type)
+    end
+    |> Enum.uniq()
+  end
+
+  @doc """
+  The CIMD document for this instance as an OAuth client.
+  Served at `/.well-known/oauth-client`.
+  """
+  def cimd_document do
+    base_url = Bonfire.Common.URIs.base_url()
+
+    %{
+      "client_id" => cimd_client_id(),
+      "client_name" =>
+        (Bonfire.Common.Config.get([:ui, :theme, :instance_name]) ||
+           Bonfire.Common.Config.get([:bonfire, :app_name], "Bonfire")) <>
+          " (#{URI.parse(base_url).host})",
+      "client_uri" => base_url,
+      "redirect_uris" => all_redirect_uris(),
+      "grant_types" => ["authorization_code", "refresh_token"],
+      "response_types" => ["code"],
+      "token_endpoint_auth_method" => "none",
+      "application_type" => "web"
+    }
+  end
+
   def open_id_connect_providers do
     Config.get([:bonfire_open_id, :openid_connect_providers], [])
     |> Enum.map(fn {provider, config} ->

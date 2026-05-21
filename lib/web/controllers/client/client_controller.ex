@@ -71,8 +71,8 @@ defmodule Bonfire.OpenID.Web.ClientController do
         %{
           # Required - indicates we want an authorization code
           "response_type" => config[:response_type] || "code",
-          # Required - the client's ID
-          "client_id" => config[:client_id],
+          # Required - the client's ID (fall back to this instance's CIMD URL if not configured)
+          "client_id" => config[:client_id] || Bonfire.OpenID.Client.cimd_client_id(),
           # "http://localhost:4001/openid_client/test_provider", # Required - must match registered URI
           "redirect_uri" => config[:redirect_uri],
           # Optional - space-separated list of requested permissions
