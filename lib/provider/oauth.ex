@@ -5,6 +5,11 @@ defmodule Bonfire.OpenID.Provider.OAuth do
     :ok
   end
 
+  # Mastodon-compatible "out of band" URIs for native/CLI apps
+  def redirect_uri_validate("urn:ietf:wg:oauth:2.0:oob" <> _rest) do
+    :ok
+  end
+
   def redirect_uri_validate("" <> uri) do
     case URI.parse(uri) do
       %URI{scheme: scheme, host: host, fragment: fragment}

@@ -32,11 +32,11 @@ defmodule Bonfire.API.MastoCompatible.AppController do
         error(other)
 
         conn
-        |> put_status(500)
+        |> put_status(422)
         |> put_view(OauthView)
         |> render("error.json",
           error: "Could not create a client",
-          error_description: inspect(other)
+          error_description: "Invalid client parameters"
         )
     end
   end
