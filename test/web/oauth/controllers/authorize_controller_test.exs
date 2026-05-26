@@ -167,6 +167,35 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
                "http://redirect.uri?code=code"
     end
 
+    test "preserves requested scope without forcing offline_access", %{conn: conn} do
+      current_user = %User{}
+
+      conn =
+        conn
+        |> assign(:current_user, current_user)
+        |> Map.put(:params, %{"scope" => "identity data:public"})
+        |> Map.put(:query_params, %{"scope" => "identity data:public"})
+
+      response = %AuthorizeResponse{
+        type: :code,
+        redirect_uri: "http://redirect.uri",
+        code: "code"
+      }
+
+      Boruta.OauthMock
+      |> expect(:authorize, fn conn, _resource_owner, module ->
+        assert conn.params["scope"] == "identity data:public"
+        assert conn.query_params["scope"] == "identity data:public"
+
+        module.authorize_success(conn, response)
+      end)
+
+      conn = AuthorizeController.authorize(conn, conn.params)
+
+      assert redirected_to(conn) ==
+               "http://redirect.uri?code=code"
+    end
+
     test "redirects with an code and a state", %{conn: conn} do
       current_user = %User{}
       conn = assign(conn, :current_user, current_user)

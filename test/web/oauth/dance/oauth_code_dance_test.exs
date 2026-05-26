@@ -51,6 +51,9 @@ defmodule Bonfire.OpenID.OAuthCodeDanceTest do
 
     assert %{"access_token" => access_token} = token_data
     assert access_token, "Should receive access token"
+    refute Map.has_key?(token_data, "refresh_token")
+    refute "offline_access" in String.split(token_data["scope"] || "", " ", trim: true)
+    assert token_data["expires_in"] > div(to_timeout(day: 300), 1_000)
 
     # Verify access token works
     verify_userinfo_endpoint(secondary_instance, access_token)

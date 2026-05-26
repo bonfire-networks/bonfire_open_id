@@ -46,6 +46,8 @@ defmodule Bonfire.OpenID.OAuthRefreshDanceTest do
     # Verify initial access token works
     verify_userinfo_endpoint(secondary_instance, access_token)
 
+    assert refresh_token, "Should receive refresh token when offline_access is requested"
+
     # Step 2: Use refresh token to get new access token
     req = create_req_client(secondary_instance)
 
