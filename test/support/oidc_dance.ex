@@ -453,6 +453,36 @@ defmodule Bonfire.OpenID.OIDCDance do
     {client_id, client_secret, registration_access_token, registration_client_uri}
   end
 
+  def perform_dynamic_registration_public_client(req, registration_endpoint, redirect_uri) do
+    registration_request = %{
+      "redirect_uris" => [redirect_uri],
+      "client_name" => "Dynamically Registered Public Test Client",
+      "grant_types" => ["authorization_code"],
+      "response_types" => ["code"],
+      "scope" => "openid profile email identity data:public",
+      "application_type" => "web",
+      "token_endpoint_auth_method" => "none"
+    }
+
+    {:ok, registration_response} =
+      apply_with_repo_sync(fn ->
+        Req.post(req,
+          url: registration_endpoint,
+          json: registration_request,
+          headers: [{"content-type", "application/json"}]
+        )
+      end)
+
+    assert registration_response.status in [200, 201], "Public client registration should succeed"
+
+    body = registration_response.body
+    assert body["client_id"], "Should receive client_id"
+    refute Map.has_key?(body, "client_secret"), "Public client MUST NOT receive a client_secret"
+    assert body["token_endpoint_auth_method"] == "none", "Should confirm public auth method"
+
+    {body["client_id"], body["registration_access_token"], body["registration_client_uri"]}
+  end
+
   # Helper function to test the dynamically registered client
   def test_dynamic_client_auth_flow(
         client_id,

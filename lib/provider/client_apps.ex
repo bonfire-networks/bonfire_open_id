@@ -319,6 +319,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       registration_access_token = generate_registration_access_token()
       client_id = generate_client_id()
 
+      public_client? = validated_params["token_endpoint_auth_method"] == "none"
+
       # NOTE: we store registration token in metadata since Boruta doesn't have a dedicated field
       client_params =
         %{
@@ -327,28 +329,42 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
           supported_scopes: parse_scopes(validated_params["scope"]) || default_scopes(),
           supported_grant_types: validated_params["grant_types"] || ["authorization_code"],
           name: validated_params["client_name"] || "Dynamically Registered Client",
-          # Store registration token in metadata
+          confidential: !public_client?,
+          pkce: public_client?,
           metadata: %{"registration_access_token" => registration_access_token}
         }
         |> debug("create params for dynamic client")
 
       case new(client_params) do
         {:ok, client} ->
-          client_response = %{
-            "client_id" => client.id,
-            "client_secret" => client.secret,
-            # 0 means the secret does not expire (required by RFC 7591)
-            "client_secret_expires_at" => 0,
-            "registration_access_token" => registration_access_token,
-            "registration_client_uri" =>
-              "#{Bonfire.Common.URIs.base_url()}/openid/register/#{client.id}",
-            "client_name" => client.name,
-            "redirect_uris" => client.redirect_uris,
-            "grant_types" => client.supported_grant_types,
-            "response_types" => validated_params["response_types"] || ["code"],
-            "scope" =>
-              Enum.join(client.authorized_scopes |> Enum.map(& &1.name) || default_scopes(), " ")
-          }
+          client_response =
+            %{
+              "client_id" => client.id,
+              "registration_access_token" => registration_access_token,
+              "registration_client_uri" =>
+                "#{Bonfire.Common.URIs.base_url()}/openid/register/#{client.id}",
+              "client_name" => client.name,
+              "redirect_uris" => client.redirect_uris,
+              "grant_types" => client.supported_grant_types,
+              "response_types" => validated_params["response_types"] || ["code"],
+              "scope" =>
+                Enum.join(
+                  client.authorized_scopes |> Enum.map(& &1.name) || default_scopes(),
+                  " "
+                )
+            }
+            |> then(fn resp ->
+              # RFC 7591: MUST NOT issue client_secret to public clients
+              if public_client?,
+                do: Map.put(resp, "token_endpoint_auth_method", "none"),
+                else:
+                  Map.merge(resp, %{
+                    "token_endpoint_auth_method" => "client_secret_post",
+                    "client_secret" => client.secret,
+                    # 0 means the secret does not expire
+                    "client_secret_expires_at" => 0
+                  })
+            end)
 
           {:ok, client_response}
 
