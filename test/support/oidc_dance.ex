@@ -304,7 +304,7 @@ defmodule Bonfire.OpenID.OIDCDance do
 
     # Create canonical user ID for federation
     home_instance = user_identity["iss"]
-    canonical_id = "#{user_identity["sub"]}@#{URI.parse(home_instance).host}"
+    canonical_id = "#{user_identity["sub"]}@#{Bonfire.Common.URIs.base_domain(home_instance)}"
     debug(canonical_id, "canonical federated user ID")
 
     debug("Cross-instance user info test successful!")

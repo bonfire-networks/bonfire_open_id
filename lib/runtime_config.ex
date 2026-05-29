@@ -84,7 +84,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         ]
     end
 
-    # connect as a client to the orcid.org OpenID Connect provider with callback url https://yourinstance.tld/oauth/client/orcid
+    # connect as a client to the orcid.org OpenID Connect provider with callback url https://yourinstance.tld/openid/client/orcid
     if orcid_client_id = System.get_env("ORCID_CLIENT_ID") do
       base_uri =
         if System.get_env("ORCID_ENV") == "sandbox" do
