@@ -5,6 +5,5 @@ Ecto.Adapters.SQL.Sandbox.mode(
   :manual
 )
 
-# to test openid/oauth
-Mox.defmock(Boruta.OauthMock, for: Boruta.OauthModule)
-Mox.defmock(Boruta.OpenidMock, for: Boruta.OpenidModule)
+# NOTE: the OAuth/OpenID Mox mocks are defined in `test/support/mocks.ex` so they
+# load on path-scoped runs too (the umbrella only loads the root test_helper.exs).
