@@ -83,7 +83,15 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
            registration_redirect_uri,
            attrs
          ) do
-      {:ok, %{id: id} = _client} ->
+      {:ok, %{id: id} = client} ->
+        # A CIMD client is resolved by a deterministic id derived from its
+        # client_id URL, so an already-registered client is returned as-is and
+        # its stored redirect_uris can be stale if the hosted CIMD document has
+        # changed since first registration. Reconcile them with the freshly
+        # fetched document so edits to client.jsonld propagate automatically
+        # (Boruta loads the client by id later in the pipeline, after this plug).
+        maybe_sync_cimd_redirect_uris(client, doc_redirect_uris)
+
         %{
           conn
           | query_params:
@@ -107,4 +115,18 @@ defmodule Bonfire.OpenID.Plugs.ClientID do
   end
 
   defp maybe_register_client(conn, _client_id, _redirect_uri), do: conn
+
+  # Keep an existing CIMD client's redirect_uris in sync with its metadata
+  # document. No-op for freshly-created clients (already built from the doc) and
+  # for non-CIMD clients (empty doc list). Only writes when the set differs.
+  defp maybe_sync_cimd_redirect_uris(client, doc_redirect_uris)
+       when is_list(doc_redirect_uris) and doc_redirect_uris != [] do
+    if MapSet.new(client.redirect_uris || []) == MapSet.new(doc_redirect_uris) do
+      {:ok, client}
+    else
+      ClientApps.update_redirect_uris(client, doc_redirect_uris)
+    end
+  end
+
+  defp maybe_sync_cimd_redirect_uris(client, _doc_redirect_uris), do: {:ok, client}
 end
