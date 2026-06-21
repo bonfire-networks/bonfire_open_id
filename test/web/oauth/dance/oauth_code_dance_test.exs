@@ -51,7 +51,10 @@ defmodule Bonfire.OpenID.OAuthCodeDanceTest do
 
     assert %{"access_token" => access_token} = token_data
     assert access_token, "Should receive access token"
-    refute Map.has_key?(token_data, "refresh_token")
+    # Even without offline_access, the authorization_code grant issues a refresh token
+    # so native apps have a recovery path (#1806) — while the access token stays
+    # long-lived and the scope is left unchanged (not forced to offline_access).
+    assert token_data["refresh_token"], "Should receive a refresh token (#1806)"
     refute "offline_access" in String.split(token_data["scope"] || "", " ", trim: true)
     assert token_data["expires_in"] > div(to_timeout(day: 300), 1_000)
 
