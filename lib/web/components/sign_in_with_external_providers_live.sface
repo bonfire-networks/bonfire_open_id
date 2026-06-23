@@ -1,6 +1,27 @@
 {#case maybe_apply(Bonfire.OpenID.Client, :providers_for, [@source], fallback_return: [])}
   {#match providers when providers != []}
-    <span class="text-sm text-center">{@label || l("Sign in with an external account")}</span>
+    <span class="text-sm text-center">{cond do
+        @label ->
+          @label
+
+        @source == :add and length(providers) == 1 and List.keymember?(providers, :orcid, 0) ->
+          l(
+            "Link your ORCID to enrich your profile with your research data, and so you can then use it to sign in to this instance."
+          )
+
+        @source == :add and List.keymember?(providers, :orcid, 0) ->
+          l(
+            "Link an account you have on another service, so you can then use it to sign in to this instance."
+          ) <> " " <> l("Linking your ORCID also enriches your profile with your research data.")
+
+        @source == :add ->
+          l(
+            "Link an account you have on another service, so you can then use it to sign in to this instance."
+          )
+
+        true ->
+          l("Sign in with an external account")
+      end}</span>
     <div class="flex flex-col gap-2 mt-3">
       {#for {provider, provider_config} <-
           providers
