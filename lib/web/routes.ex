@@ -51,10 +51,22 @@ defmodule Bonfire.OpenID.Web.Routes do
         post("/token", TokenController, :token)
       end
 
+      # Authorize (GET) renders the consent screen as a LiveView, so it needs the full
+      # `:browser` pipeline (root layout + LiveSocket + CSRF) — not just `:basic`
+      scope "/oauth" do
+        pipe_through([
+          :check_provider_enabled,
+          :browser,
+          :load_authorization,
+          :validate_client_id
+        ])
+
+        get("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
+      end
+
       scope "/oauth" do
         pipe_through([:check_provider_enabled, :basic, :load_authorization, :validate_client_id])
 
-        get("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
         get("/ready", Bonfire.OpenID.Web.Oauth.ReadyController, :ready)
 
         # NOTE: points to OpenID userinfo endpoint instead
@@ -75,10 +87,16 @@ defmodule Bonfire.OpenID.Web.Routes do
         post("/authorize", Bonfire.OpenID.Web.Oauth.AuthorizeController, :authorize)
       end
 
+      # Authorize (GET) renders the consent screen as a LiveView (needs `:browser`)
+      scope "/openid" do
+        pipe_through([:check_provider_enabled, :browser, :load_authorization])
+
+        get("/authorize", Bonfire.OpenID.Web.Openid.AuthorizeController, :authorize)
+      end
+
       scope "/openid" do
         pipe_through([:check_provider_enabled, :basic, :load_authorization])
 
-        get("/authorize", Bonfire.OpenID.Web.Openid.AuthorizeController, :authorize)
         get("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
         post("/userinfo", Bonfire.OpenID.Web.Openid.UserinfoController, :userinfo)
         get("/jwks", Bonfire.OpenID.Web.Openid.JwksController, :jwks_index)

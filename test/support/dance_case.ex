@@ -33,12 +33,22 @@ defmodule Bonfire.OpenID.DanceCase do
     # Set a known password for the test user
     test_password = "test_password_123"
 
+    local = fake_user!(%{credential: %{password: test_password}}, %{name: "Local"})
+
+    remote =
+      TestInstanceRepo.apply(fn ->
+        fake_user!(%{credential: %{password: test_password}}, %{name: "Remote"})
+      end)
+
+    # These dance tests exercise the token flow, not the OAuth consent screen — pre-grant
+    # consent so the authorize flow proceeds straight to issuing codes/tokens without
+    # rendering the consent screen. (Consent UX is covered by dedicated tests.)
+    Bonfire.OpenID.Web.Consent.remember_consent_all(local)
+    Bonfire.OpenID.Web.Consent.remember_consent_all(remote)
+
     [
-      local: fake_user!(%{credential: %{password: test_password}}, %{name: "Local"}),
-      remote:
-        TestInstanceRepo.apply(fn ->
-          fake_user!(%{credential: %{password: test_password}}, %{name: "Remote"})
-        end),
+      local: local,
+      remote: remote,
       test_password: test_password
     ]
   end

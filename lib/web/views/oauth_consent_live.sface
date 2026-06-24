@@ -1,0 +1,63 @@
+<main
+  id="oauth-consent"
+  data-role="oauth_consent"
+  class="min-h-[calc(100vh-4rem)] flex items-center justify-center py-10 px-4"
+>
+  <div class="w-full max-w-xl">
+    <div class="text-center mb-8">
+      <h1 class="text-2xl font-bold text-base-content" data-role="oauth_client">
+        {@client_name || l("An application")}
+      </h1>
+      <p class="text-sm text-base-content/60 mt-1">{l("is requesting access to your account")}</p>
+    </div>
+
+    {#if @client_logo}
+      <img src={@client_logo} alt={@client_name} class="w-16 h-16 mx-auto mb-6 rounded-xl">
+    {/if}
+
+    <div data-role="oauth_profile" class="mb-6">
+      <p class="text-xs text-base-content/60 mb-2 text-center">{l("Authorizing as")}</p>
+      <StatelessComponent
+        module={maybe_module(Bonfire.UI.Me.UserPreviewLive)}
+        user={current_user(@__context__)}
+        with_summary={false}
+        is_local
+        class="rounded-xl component_user_preview"
+      />
+      {#if @allow_switch_profile?}
+        <p class="mt-2 text-center text-xs">
+          <a href={"/switch-user" <> @go} class="link link-primary">{l("Use a different profile")}</a>
+        </p>
+      {/if}
+    </div>
+
+    <div class="card bg-base-200/40 mb-8">
+      <div class="card-body p-5">
+        <h2 class="text-sm font-semibold text-base-content/70 mb-3">{l("This will allow access to:")}</h2>
+        <ul class="flex flex-col gap-2">
+          {#for scope <- @scopes}
+            <li data-role="oauth_scope" class="flex items-start gap-2 text-base-content">
+              <#Icon solid="Check" class="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <span class="font-medium">{e(scope, :label, nil) || e(scope, :name, "")}</span>
+            </li>
+          {/for}
+        </ul>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button
+        type="button"
+        data-role="oauth_consent_deny"
+        :on-click="deny"
+        class="btn btn-ghost flex-1"
+      >{l("Deny")}</button>
+      <button
+        type="button"
+        data-role="oauth_consent_allow"
+        :on-click="allow"
+        class="btn btn-primary flex-1"
+      >{l("Allow")}</button>
+    </div>
+  </div>
+</main>
