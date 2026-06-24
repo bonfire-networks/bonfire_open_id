@@ -7,9 +7,15 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
 
   alias Boruta.Oauth.AuthorizeResponse
   alias Boruta.Oauth.Error
+  # boruta 3.0: AuthorizeResponse `code`/`access_token` are %Token{} structs (read via `.value`)
+  alias Boruta.Oauth.Token
   alias Bonfire.OpenID.Web.Oauth.AuthorizeController
 
   setup :verify_on_exit!
+
+  defmodule User do
+    defstruct id: 1, email: "test@test.test"
+  end
 
   setup do
     conn =
@@ -18,11 +24,12 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
         %{}
       )
 
-    {:ok, conn: conn}
-  end
+    # These tests mock boruta's `authorize` directly — pre-grant consent for the fake
+    # current_user so the controller skips the consent screen (`preauthorize`) and
+    # exercises the mocked `authorize` path.
+    Bonfire.OpenID.Web.Consent.remember_consent_all(%User{})
 
-  defmodule User do
-    defstruct id: 1, email: "test@test.test"
+    {:ok, conn: conn}
   end
 
   describe "authorize/2" do
@@ -103,7 +110,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       response = %AuthorizeResponse{
         type: :token,
         redirect_uri: "http://redirect.uri",
-        access_token: "access_token",
+        access_token: %Token{type: "access_token", value: "access_token"},
         expires_in: 10
       }
 
@@ -127,7 +134,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       response = %AuthorizeResponse{
         type: :token,
         redirect_uri: "http://redirect.uri",
-        access_token: "access_token",
+        access_token: %Token{type: "access_token", value: "access_token"},
         expires_in: 10,
         state: "state"
       }
@@ -153,7 +160,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       response = %AuthorizeResponse{
         type: :code,
         redirect_uri: "http://redirect.uri",
-        code: "code"
+        code: %Token{type: "code", value: "code"}
       }
 
       Boruta.OauthMock
@@ -179,7 +186,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       response = %AuthorizeResponse{
         type: :code,
         redirect_uri: "http://redirect.uri",
-        code: "code"
+        code: %Token{type: "code", value: "code"}
       }
 
       Boruta.OauthMock
@@ -203,7 +210,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       response = %AuthorizeResponse{
         type: :code,
         redirect_uri: "http://redirect.uri",
-        code: "code",
+        code: %Token{type: "code", value: "code"},
         state: "state"
       }
 

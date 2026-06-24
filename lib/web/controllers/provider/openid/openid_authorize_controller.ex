@@ -8,6 +8,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   alias Boruta.Oauth.Error
   alias Boruta.Oauth.ResourceOwner
   alias Bonfire.OpenID.Web.OauthView
+  alias Bonfire.OpenID.Web.Consent
+  alias Bonfire.OpenID.Web.OauthConsentLive
 
   def oauth_module,
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
@@ -23,7 +25,20 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
          resource_owner = get_resource_owner(conn),
          {:unchanged, conn} <- max_age_redirection(conn, resource_owner),
          {:unchanged, conn} <- login_redirection(conn) |> debug("login_redirection?") do
-      oauth_module().authorize(conn, resource_owner, __MODULE__)
+      current_user = current_user(conn)
+
+      if is_nil(current_user) or
+           Consent.consented?(
+             current_user,
+             conn.query_params["client_id"],
+             conn.query_params["scope"]
+           ) do
+        # no logged-in user (let boruta produce the login/error response), or already consented
+        oauth_module().authorize(conn, resource_owner, __MODULE__)
+      else
+        # validate the request, then show the consent screen (via preauthorize_success)
+        oauth_module().preauthorize(conn, resource_owner, __MODULE__)
+      end
     end
   end
 
@@ -108,6 +123,17 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     |> put_status(status)
     |> put_view(OauthView)
     |> render("error.html", error: error, error_description: error_description)
+  end
+
+  @impl Boruta.Oauth.AuthorizeApplication
+  def preauthorize_success(conn, authorization) do
+    # the request is valid: render the scope-consent screen
+    OauthConsentLive.live_render_consent(conn, authorization)
+  end
+
+  @impl Boruta.Oauth.AuthorizeApplication
+  def preauthorize_error(conn, error) do
+    authorize_error(conn, error)
   end
 
   # what was this for?

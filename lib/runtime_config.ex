@@ -77,7 +77,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           display_name: System.get_env("OPENID_1_DISPLAY_NAME", l("Single sign-on")),
           discovery_document_uri: main_discovery_document_uri,
           client_id: System.get_env("OPENID_1_CLIENT_ID"),
-          client_secret: System.get_env("OPENID_1_CLIENT_SECRET"),
+          client_secret: Bonfire.Common.EnvSecrets.env_or_file("OPENID_1_CLIENT_SECRET"),
           response_type: System.get_env("OPENID_1_RESPONSE_TYPE", "code"),
           scope: System.get_env("OPENID_1_SCOPE", "identity data:public"),
           enable_signup: System.get_env("OPENID_1_ENABLE_SIGNUP") != "false"
@@ -106,7 +106,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
           # only_supports_login: true,
           discovery_document_uri: "#{base_uri}/.well-known/openid-configuration",
           client_id: orcid_client_id,
-          client_secret: System.get_env("ORCID_CLIENT_SECRET"),
+          client_secret: Bonfire.Common.EnvSecrets.env_or_file("ORCID_CLIENT_SECRET"),
           response_type: "code",
           scope: scope,
           enable_signup: true
@@ -119,7 +119,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         oauth_1: [
           display_name: System.get_env("OAUTH_1_DISPLAY_NAME", l("Single sign-on")),
           client_id: oauth_app_client_id,
-          client_secret: System.get_env("OAUTH_1_CLIENT_SECRET"),
+          client_secret: Bonfire.Common.EnvSecrets.env_or_file("OAUTH_1_CLIENT_SECRET"),
           authorize_uri: System.get_env("OAUTH_1_AUTHORIZE_URI"),
           access_token_uri: System.get_env("OAUTH_1_ACCESS_TOKEN_URI"),
           userinfo_uri: System.get_env("OAUTH_1_USERINFO_URI"),
@@ -136,7 +136,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         github: [
           display_name: "GitHub",
           client_id: github_app_client_id,
-          client_secret: System.get_env("GITHUB_CLIENT_SECRET"),
+          client_secret: Bonfire.Common.EnvSecrets.env_or_file("GITHUB_CLIENT_SECRET"),
           authorize_uri: "https://github.com/login/oauth/authorize",
           access_token_uri: "https://github.com/login/oauth/access_token",
           userinfo_uri: "https://api.github.com/user",
@@ -157,7 +157,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         zenodo: [
           display_name: System.get_env("ZENODO_DISPLAY_NAME", "Zenodo"),
           client_id: zenodo_client_id,
-          client_secret: System.get_env("ZENODO_CLIENT_SECRET"),
+          client_secret: Bonfire.Common.EnvSecrets.env_or_file("ZENODO_CLIENT_SECRET"),
           authorize_uri: "#{base_uri}/oauth/authorize",
           access_token_uri: "#{base_uri}/oauth/token",
           userinfo_uri: "#{base_uri}/api/me",

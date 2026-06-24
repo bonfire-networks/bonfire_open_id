@@ -7,27 +7,30 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   alias Boruta.Oauth.Error
   alias Boruta.Oauth.ResourceOwner
   alias Bonfire.OpenID.Web.OauthView
+  alias Bonfire.OpenID.Web.Consent
+  alias Bonfire.OpenID.Web.OauthConsentLive
 
   def oauth_module,
     do: Application.get_env(:bonfire_open_id, :oauth_module, Boruta.Oauth)
 
   def authorize(%Plug.Conn{} = conn, params) do
     current_account = current_account(conn)
-    current_user = current_user(conn) || current_account
+    current_user = current_user(conn)
     conn = store_user_return_to(conn)
 
     login_hint = params["login_hint"]
 
     cond do
-      is_nil(current_user) ->
+      is_nil(current_user) and is_nil(current_account) ->
         authorize_response(conn, nil)
 
-      login_hint_matches?(current_user, login_hint) ->
+      not is_nil(current_user) and login_hint_matches?(current_user, login_hint) ->
         authorize_response(conn, current_user)
 
       true ->
-        # login_hint doesn't match current user/account, try to find a
-        # matching profile in the account before redirecting to pick profile
+        # no single profile resolved (account-level session, or a login_hint that
+        # doesn't match the current user): try to find a matching profile in the
+        # account, else show the consent screen with an embedded profile picker
         case find_matching_user(current_account, login_hint) do
           {:ok, matching_user} ->
             authorize_response(conn, matching_user)
@@ -35,7 +38,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
           _ ->
             debug(
               login_hint,
-              "login_hint doesn't match any user in account, redirecting to pick profile"
+              "no single profile resolved, redirecting to the profile picker"
             )
 
             redirect_to_pick_profile(conn)
@@ -87,11 +90,25 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
   defp authorize_response(conn, %_{} = current_user) do
     with {:ok, %ResourceOwner{} = resource_owner} <- Bonfire.OpenID.get_user(current_user) do
-      conn
-      |> oauth_module().authorize(
-        resource_owner,
-        __MODULE__
-      )
+      if Consent.consented?(
+           current_user,
+           conn.query_params["client_id"],
+           conn.query_params["scope"]
+         ) do
+        # already consented to this client + scopes: issue the code/token directly
+        conn
+        |> oauth_module().authorize(
+          resource_owner,
+          __MODULE__
+        )
+      else
+        # validate the request, then show the consent screen (via preauthorize_success)
+        conn
+        |> oauth_module().preauthorize(
+          resource_owner,
+          __MODULE__
+        )
+      end
     else
       e ->
         err(e, "Could not build resource owner from current_user")
@@ -180,10 +197,15 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
-  def preauthorize_success(_conn, _response), do: :ok
+  def preauthorize_success(conn, authorization) do
+    # the request is valid: render the scope-consent screen
+    OauthConsentLive.live_render_consent(conn, authorization)
+  end
 
   @impl Boruta.Oauth.AuthorizeApplication
-  def preauthorize_error(_conn, _response), do: :ok
+  def preauthorize_error(conn, error) do
+    authorize_error(conn, error)
+  end
 
   defp store_user_return_to(conn, url \\ nil) do
     conn
