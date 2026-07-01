@@ -70,7 +70,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
 
     # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082
 
-    # connect as a client to an OpenID Connect provider https://yourinstance.tld/oauth/client/openid_1
+    # connect as a client to an OpenID Connect provider https://yourinstance.tld/openid/client/openid_1
     if main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY") do
       config :bonfire_open_id, :openid_connect_providers,
         openid_1: [
