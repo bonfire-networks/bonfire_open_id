@@ -8,7 +8,7 @@
       <h1 class="text-2xl font-bold text-base-content" data-role="oauth_client">
         {@client_name || l("An application")}
       </h1>
-      <p class="text-sm text-base-content/60 mt-1">{l("is requesting access to your account")}</p>
+      <p class="text-sm text-base-content mt-1">{l("is requesting access to your account")}</p>
     </div>
 
     {#if @client_logo}
@@ -16,7 +16,7 @@
     {/if}
 
     <div data-role="oauth_profile" class="mb-6">
-      <p class="text-xs text-base-content/60 mb-2 text-center">{l("Authorizing as")}</p>
+      <p class="text-xs text-base-content mb-2 text-center">{l("Authorizing as")}</p>
       <StatelessComponent
         module={maybe_module(Bonfire.UI.Me.UserPreviewLive)}
         user={current_user(@__context__)}
@@ -33,7 +33,7 @@
 
     <div class="card bg-base-200/40 mb-8">
       <div class="card-body p-5">
-        <h2 class="text-sm font-semibold text-base-content/70 mb-3">{l("This will allow access to:")}</h2>
+        <h2 class="text-sm font-semibold text-base-content mb-3">{l("This will allow access to:")}</h2>
         <ul class="flex flex-col gap-2">
           {#for scope <- @scopes}
             <li data-role="oauth_scope" class="flex items-start gap-2 text-base-content">
