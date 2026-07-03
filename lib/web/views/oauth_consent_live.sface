@@ -33,7 +33,7 @@
 
     <div class="card bg-base-200/40 mb-8">
       <div class="card-body p-5">
-        <h2 class="text-sm font-semibold text-base-content mb-3">{l("This will allow access to:")}</h2>
+        <h2 class="text-sm font-medium text-base-content mb-3">{l("This will allow access to:")}</h2>
         <ul class="flex flex-col gap-2">
           {#for scope <- @scopes}
             <li data-role="oauth_scope" class="flex items-start gap-2 text-base-content">
