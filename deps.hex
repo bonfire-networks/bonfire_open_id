@@ -1,6 +1,6 @@
 faker_fork = "~> 0.19" # fake data generation
 jason = "~> 1.0"
-boruta = "~> 3.0.0-beta.4" # openid / oauth provider
+# boruta = "~> 3.0.0-beta.4" # openid / oauth provider
 nebulex_distributed = "~> 3.0" # Nebulex.Adapters.Replicated (required by boruta)
 nebulex = "~> 3.0.3" # override boruta's ~> 2.0 requirement
 openid_connect = "~> 1.0.0" # openid client
