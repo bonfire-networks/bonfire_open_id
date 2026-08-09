@@ -17,7 +17,13 @@ defmodule Bonfire.OpenID.MixProject do
           {:phoenix_live_reload, "~> 1.2", only: :dev},
 
           {:floki, ">= 0.0.0", only: [:dev, :test], override: true},
-          {:mox, "~> 1.0", only: [:dev, :test]}
+          {:mox, "~> 1.0", only: [:dev, :test]},
+
+          # boruta pinned to a commit (181 commits past 3.0.0-beta.4). Declared here with `ref:` rather than via deps.git, whose `#<sha>` is parsed as `branch:` → Mix runs `git checkout origin/<sha>`, which never resolves (a SHA isn't a branch).
+          {:boruta,
+           git: "https://github.com/malach-it/boruta_auth",
+           ref: "cfdb52d742f37bfc146df659bb9f651018197ad0",
+           override: true}
         ])
     ]
   end
