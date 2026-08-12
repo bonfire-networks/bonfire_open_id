@@ -1,5 +1,8 @@
 defmodule Bonfire.OpenID.Provider.CIMDClientIDPlugTest do
   use ExUnit.Case, async: false
+
+  # bucket this into the backend CI leg: bare `ExUnit.Case` skips the tag the extension case templates apply, so without it this also runs in the federation job catch-all
+  @moduletag :backend
   use Repatch.ExUnit
 
   import Plug.Test
