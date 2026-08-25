@@ -57,7 +57,7 @@ defmodule Bonfire.OpenID do
        # TODO: are we recording last seen on login and/or when the user was last active?
        last_login_at:
          if(Types.is_uid?(id),
-           do: Bonfire.Social.Seen.last_date(id, current_account_id(current_user))
+           do: Bonfire.Social.Seen.last_date(id, current_user)
          ) || e(current_user, :last_login_at, nil)
      }}
   end
