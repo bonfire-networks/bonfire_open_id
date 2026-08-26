@@ -54,11 +54,10 @@ defmodule Bonfire.OpenID do
        username:
          e(current_user, :character, :username, nil) ||
            e(current_account(current_user), :email, :email_address, nil),
-       # TODO: are we recording last seen on login and/or when the user was last active?
+       # last-seen edge is written per-profile at login (subject=account, object=user); read it back via the account-preloaded current_user so subject→account, object=user matches.
        last_login_at:
-         if(Types.is_uid?(id),
-           do: Bonfire.Social.Seen.last_date(id, current_user)
-         ) || e(current_user, :last_login_at, nil)
+         if(current_user, do: Bonfire.Social.Seen.last_date(current_user, current_user)) ||
+           e(current_user, :last_login_at, nil)
      }}
   end
 
