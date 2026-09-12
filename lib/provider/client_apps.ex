@@ -68,12 +68,11 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   def get_or_new(id_or_name, redirect_uris, attrs \\ %{}) do
     id = id_or_name_to_id(id_or_name)
 
-    case get(id, id_or_name, redirect_uris) |> debug("got") do
+    case get(id, id_or_name, redirect_uris) do
       nil ->
         redirect_uris = List.wrap(redirect_uris)
 
         new(Map.merge(%{id: id, name: id_or_name, redirect_uris: redirect_uris}, attrs))
-        |> debug("newed")
 
       client ->
         {:ok, client}
@@ -81,8 +80,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
   end
 
   def get_or_new(clauses) do
-    case get(clauses) |> debug("got") do
-      nil -> new(Map.new(clauses)) |> debug("newed")
+    case get(clauses) do
+      nil -> new(Map.new(clauses))
       client -> {:ok, client}
     end
   end
@@ -276,16 +275,10 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       # token_endpoint_jwt_auth_alg: nil, # associated to authentication methods, the algorithm to use along
       # jwt_public_key: nil # pem public key to be used with `private_key_jwt` authentication method
     }
-    |> Map.merge(
-      params
-      |> debug("input params for client")
-    )
+    |> Map.merge(params)
     # OAuth client_secret
     |> Map.put_new_lazy(:secret, fn -> SecureRandom.hex(64) end)
-    |> debug("full data for client to create")
-    # |> Enums.deep_merge(params)
     |> Boruta.Ecto.Admin.create_client()
-    |> debug("client created")
   end
 
   def init_test_client_app(id \\ "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", attrs \\ %{}) do

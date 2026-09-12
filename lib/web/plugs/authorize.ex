@@ -76,6 +76,41 @@ defmodule Bonfire.OpenID.Plugs.Authorize do
     end
   end
 
+  @doc """
+  Requires one of the acceptable scopes when a user token is supplied, preserving session-only access.
+
+  Call after authorization and current-user loading. List accepted scopes explicitly, including any parent scope; for example, `["write:statuses", "write"]` permits publishing. Invalid credentials and app-only tokens cannot fall back to a session.
+  """
+  def require_token_scope(conn, acceptable_scopes) do
+    case conn.assigns do
+      %{current_token: %{sub: subject}, current_user: %{id: subject}}
+      when is_binary(subject) ->
+        if Enum.any?(acceptable_scopes, &authorized_scopes?(conn, [&1])) do
+          conn
+        else
+          reject_token(conn, :forbidden, l("This action is outside the authorized scopes."))
+        end
+
+      %{current_token: %{}} ->
+        reject_token(conn, :unauthorized, l("This method requires a user access token."))
+
+      _ ->
+        if get_req_header(conn, "authorization") != [] or
+             Map.has_key?(conn.params, "access_token") do
+          reject_token(conn, :unauthorized, l("The access token is invalid."))
+        else
+          conn
+        end
+    end
+  end
+
+  defp reject_token(conn, status, message) do
+    conn
+    |> put_status(status)
+    |> Phoenix.Controller.json(%{"error" => message})
+    |> halt()
+  end
+
   def authorized_scopes?(conn, required_scopes) do
     current_scopes = Scope.split(conn.assigns[:current_token].scope)
 
