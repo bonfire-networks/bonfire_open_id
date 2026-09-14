@@ -2,7 +2,7 @@ defmodule Bonfire.OpenID.Web.OauthConsentLive do
   @moduledoc """
   Scope-consent screen for the OAuth/OpenID `authorize` flow.
 
-  Rendered by the authorize controllers (via `live_render_consent/2`) when a logged-in user has not yet consented to a client + scopes. Mirrors the bonfire_ui_me: a controller `live_render`s this Surface LiveView
+  Rendered by the authorize controllers (via `live_render_consent/3`) when a logged-in user has not yet consented to a client + scopes. Mirrors the bonfire_ui_me: a controller `live_render`s this Surface LiveView
   """
   use Bonfire.UI.Common.Web, :surface_live_view_child
 
@@ -13,8 +13,8 @@ defmodule Bonfire.OpenID.Web.OauthConsentLive do
               Bonfire.UI.Me.LivePlugs.UserRequired
             ]}
 
-  @doc "Called by the authorize controllers to render the consent screen for a validated request."
-  def live_render_consent(conn, authorization) do
+  @doc "Renders a validated request with an explicit authorization path because login can invoke authorization on its own request connection."
+  def live_render_consent(conn, authorization, authorization_path) do
     # key consent on the scope as requested in the query, so `remember_consent` (on Allow)
     # and `consented?` (on the re-invoked authorize) use the same value
     scope = conn.query_params["scope"] || e(authorization, :requested_scope, nil)
@@ -28,11 +28,15 @@ defmodule Bonfire.OpenID.Web.OauthConsentLive do
       scopes: Consent.scopes_for_display(scope, client),
       redirect_uri: e(authorization, :redirect_uri, nil) || conn.query_params["redirect_uri"],
       state: e(authorization, :state, nil) || conn.query_params["state"],
+      response_mode: conn.query_params["response_mode"],
+      response_type: conn.query_params["response_type"],
       login_hint: conn.query_params["login_hint"],
-      go: Phoenix.Controller.current_path(conn, conn.query_params)
+      go: authorization_path <> "?" <> Plug.Conn.Query.encode(conn.query_params)
     }
 
-    live_render_with_data(conn, data)
+    conn
+    |> Plug.Conn.put_status(:ok)
+    |> live_render_with_data(data)
   end
 
   defp live_render_with_data(conn, data) do
@@ -79,8 +83,26 @@ defmodule Bonfire.OpenID.Web.OauthConsentLive do
       %{"error" => "access_denied"}
       |> maybe_put("state", Map.get(data, :state))
 
-    deny_url = "#{Map.get(data, :redirect_uri)}?#{URI.encode_query(query)}"
+    deny_url =
+      data
+      |> denial_uri(query)
+      |> URI.to_string()
 
     {:noreply, redirect_to(socket, deny_url, type: :maybe_external)}
+  end
+
+  defp denial_uri(data, query) do
+    uri = data |> Map.fetch!(:redirect_uri) |> URI.parse()
+
+    case Map.get(data, :response_mode) do
+      "fragment" -> Map.put(uri, :fragment, URI.encode_query(query))
+      "query" -> Bonfire.Common.URIs.append_params_uri(uri, query)
+      _ ->
+        if Map.get(data, :response_type) in ["token", "id_token", "id_token token", "code id_token", "code token", "code id_token token"] do
+          Map.put(uri, :fragment, URI.encode_query(query))
+        else
+          Bonfire.Common.URIs.append_params_uri(uri, query)
+        end
+    end
   end
 end

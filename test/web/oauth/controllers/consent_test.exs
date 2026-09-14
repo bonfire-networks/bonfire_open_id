@@ -84,6 +84,39 @@ defmodule Bonfire.OpenID.Web.Oauth.ConsentTest do
     assert external =~ "state=xyz"
   end
 
+  test "Allow after magic-link login returns to authorization instead of redeeming the link again",
+       %{account: account, client: client} do
+    Process.put([:bonfire_ui_me, :login, :passwordless_only], true)
+
+    email =
+      account.email
+      |> Bonfire.Data.Identity.Email.put_token()
+      |> Bonfire.Common.Repo.update!()
+
+    authorization_path = authorize_path(client)
+
+    login_conn =
+      conn()
+      |> get(
+        "/login/forgot-password/#{email.confirm_token}?go=#{URI.encode_www_form(authorization_path)}"
+      )
+
+    {:ok, view, _html} = live(login_conn)
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view |> element("[data-role=oauth_consent_allow]") |> render_click()
+
+    assert URI.parse(to).path == "/oauth/authorize"
+    assert URI.decode_query(URI.parse(to).query) ==
+             URI.decode_query(URI.parse(authorization_path).query)
+
+    response = get(recycle(login_conn), to)
+    location = redirected_to(response)
+    assert location =~ @redirect_uri
+    assert location =~ "code="
+    assert location =~ "state=xyz"
+  end
+
   test "shows the switch-user picker when no profile is resolved, and picking one continues to consent",
        %{account: account, client: client} do
     # a second profile in the account makes the choice ambiguous

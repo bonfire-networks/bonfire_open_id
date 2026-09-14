@@ -163,7 +163,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
 
     conn
     |> redirect_to(
-      Error.redirect_to_url(error),
+      Bonfire.OpenID.Web.ErrorRedirect.url(error),
       type: :maybe_external
     )
   end
@@ -199,7 +199,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   @impl Boruta.Oauth.AuthorizeApplication
   def preauthorize_success(conn, authorization) do
     # the request is valid: render the scope-consent screen
-    OauthConsentLive.live_render_consent(conn, authorization)
+    OauthConsentLive.live_render_consent(conn, authorization, "/oauth/authorize")
   end
 
   @impl Boruta.Oauth.AuthorizeApplication

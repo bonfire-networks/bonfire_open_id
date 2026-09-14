@@ -47,14 +47,6 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     query_params =
       Plug.Conn.Query.decode(query)
       |> debug("from_query_string query_params")
-      |> Map.update("response_type", "code id_token token", fn existing_value ->
-        # FIXME: temp workaround for this error: Invalid response_type param, may be on of `code` for Authorization Code request, `code id_token`, `code token`, `code id_token token` for Hybrid requests, or `token`, `id_token token` for Implicit requests
-        case existing_value do
-          "authorization_code" -> "code"
-          "implicit" -> "id_token token"
-          _ -> "code id_token token"
-        end
-      end)
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
       |> add_unsigned_request()
       |> debug("from_query_string transformed query_params")
@@ -90,7 +82,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
       ) do
     warn("Unauthorized, redirecting")
     # TODO? redirect to login instead of error?
-    redirect_to(conn, Error.redirect_to_url(error), type: :maybe_external)
+    redirect_error(conn, error)
   end
 
   def authorize_error(
@@ -109,7 +101,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
       )
       when not is_nil(format) do
     warn(error, "Redirecting to error")
-    redirect_to(conn, Error.redirect_to_url(error), type: :maybe_external)
+    redirect_error(conn, error)
   end
 
   def authorize_error(
@@ -126,14 +118,34 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
+  def preauthorize_success(%Plug.Conn{query_params: %{"prompt" => "none"}} = conn, authorization) do
+    with {:ok, request} <- Boruta.Oauth.Request.authorize_request(conn, authorization.resource_owner) do
+      error =
+        %Error{
+          status: :bad_request,
+          error: :consent_required,
+          error_description: "User consent is required."
+        }
+        |> Error.with_format(request)
+
+      authorize_error(conn, error)
+    else
+      {:error, error} -> authorize_error(conn, error)
+    end
+  end
+
   def preauthorize_success(conn, authorization) do
     # the request is valid: render the scope-consent screen
-    OauthConsentLive.live_render_consent(conn, authorization)
+    OauthConsentLive.live_render_consent(conn, authorization, "/openid/authorize")
   end
 
   @impl Boruta.Oauth.AuthorizeApplication
   def preauthorize_error(conn, error) do
     authorize_error(conn, error)
+  end
+
+  defp redirect_error(conn, %Error{} = error) do
+    redirect_to(conn, Bonfire.OpenID.Web.ErrorRedirect.url(error), type: :maybe_external)
   end
 
   # what was this for?
@@ -214,21 +226,16 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
   end
 
   defp get_resource_owner(conn) do
-    case Bonfire.OpenID.get_user(conn) do
-      {:ok, %ResourceOwner{} = resource_owner} ->
-        resource_owner
+    if is_nil(current_user(conn)) do
+      %ResourceOwner{sub: nil}
+    else
+      case Bonfire.OpenID.get_user(conn) do
+        {:ok, %ResourceOwner{} = resource_owner} ->
+          resource_owner
 
-      e ->
-        error(e, "Could not find current user")
-
-        # %ResourceOwner{sub: nil}
-
-        # current_user ->
-        #   %ResourceOwner{
-        #     sub: to_string(current_user.id),
-        #     username: e(agent, :character, :username, nil) || e(agent, :email, :email_address, nil),
-        #     # last_login_at: current_user.last_login_at
-        #   }
+        e ->
+          error(e, "Could not find current user")
+      end
     end
   end
 
