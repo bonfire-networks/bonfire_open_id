@@ -119,7 +119,8 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
   @impl Boruta.Oauth.AuthorizeApplication
   def preauthorize_success(%Plug.Conn{query_params: %{"prompt" => "none"}} = conn, authorization) do
-    with {:ok, request} <- Boruta.Oauth.Request.authorize_request(conn, authorization.resource_owner) do
+    with {:ok, request} <-
+           Boruta.Oauth.Request.authorize_request(conn, authorization.resource_owner) do
       error =
         %Error{
           status: :bad_request,

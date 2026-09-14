@@ -121,7 +121,9 @@ defmodule Bonfire.OpenID.Web.MastoEditScopesApiTest do
   end
 
   defp edit_status(conn, post) do
-    put(conn, "/api/v1/statuses/#{post.id}",
+    put(
+      conn,
+      "/api/v1/statuses/#{post.id}",
       Jason.encode!(%{"status" => "Edited body", "spoiler_text" => "Edited warning"})
     )
   end

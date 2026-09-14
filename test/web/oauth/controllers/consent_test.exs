@@ -107,6 +107,7 @@ defmodule Bonfire.OpenID.Web.Oauth.ConsentTest do
              view |> element("[data-role=oauth_consent_allow]") |> render_click()
 
     assert URI.parse(to).path == "/oauth/authorize"
+
     assert URI.decode_query(URI.parse(to).query) ==
              URI.decode_query(URI.parse(authorization_path).query)
 

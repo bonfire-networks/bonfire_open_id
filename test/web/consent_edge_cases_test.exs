@@ -12,17 +12,25 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
     account = Helpers.fake_account!()
     user = Helpers.fake_user!(account)
     callback = "http://localhost:4000/oauth/client/side-review" <> (tags[:callback_query] || "")
-    client = ClientApps.init_test_client_app(Faker.UUID.v4(), %{
-      name: "Consent side review", redirect_uris: [callback],
-      supported_scopes: ["read", "write", "openid", "profile"]
-    })
-    {:ok, conn: conn(user: user, account: account), user: user, client: client, callback: callback}
+
+    client =
+      ClientApps.init_test_client_app(Faker.UUID.v4(), %{
+        name: "Consent side review",
+        redirect_uris: [callback],
+        supported_scopes: ["read", "write", "openid", "profile"]
+      })
+
+    {:ok,
+     conn: conn(user: user, account: account), user: user, client: client, callback: callback}
   end
 
   @tag callback_query: "?destination=inbox"
   test "denial preserves registered callback query parameters", c do
     {:ok, view, _} = live(c.conn, path(c, "oauth", %{}))
-    assert {:error, {:redirect, %{to: to}}} = view |> element("[data-role=oauth_consent_deny]") |> render_click()
+
+    assert {:error, {:redirect, %{to: to}}} =
+             view |> element("[data-role=oauth_consent_deny]") |> render_click()
+
     query = to |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
     assert query["destination"] == "inbox"
     assert query["error"] == "access_denied"
@@ -31,7 +39,10 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
 
   test "implicit denial returns errors in the fragment", c do
     {:ok, view, _} = live(c.conn, path(c, "oauth", %{"response_type" => "token"}))
-    assert {:error, {:redirect, %{to: to}}} = view |> element("[data-role=oauth_consent_deny]") |> render_click()
+
+    assert {:error, {:redirect, %{to: to}}} =
+             view |> element("[data-role=oauth_consent_deny]") |> render_click()
+
     uri = URI.parse(to)
     assert is_binary(uri.fragment)
     assert URI.decode_query(uri.fragment)["error"] == "access_denied"
@@ -48,7 +59,9 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
     Bonfire.OpenID.Web.Consent.remember_consent(c.user, c.client.id, "openid profile")
 
     response = get(c.conn, path(c, "openid", %{"prompt" => "none"}))
-    returned = response |> redirected_to() |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+    returned =
+      response |> redirected_to() |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
 
     assert is_binary(returned["code"])
     assert returned["state"] == "side-review"
@@ -59,9 +72,15 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
     @signed_in? signed_in?
     test "prompt none rejects an unregistered callback when signed in is #{signed_in?}", c do
       conn = if @signed_in?, do: c.conn, else: conn()
-      response = get(conn, path(c, "openid", %{
-        "prompt" => "none", "redirect_uri" => "https://unregistered.example/callback"
-      }))
+
+      response =
+        get(
+          conn,
+          path(c, "openid", %{
+            "prompt" => "none",
+            "redirect_uri" => "https://unregistered.example/callback"
+          })
+        )
 
       assert response.status == 401
       assert get_resp_header(response, "location") == []
@@ -71,19 +90,31 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
     for mode <- ["query", "fragment"] do
       @mode mode
       @tag callback_query: "?destination=inbox"
-      test "prompt none preserves callback and state in #{mode} when signed in is #{signed_in?}", c do
+      test "prompt none preserves callback and state in #{mode} when signed in is #{signed_in?}",
+           c do
         conn = if @signed_in?, do: c.conn, else: conn()
         state = "silent & + / café"
-        response = get(conn, path(c, "openid", %{
-          "prompt" => "none", "response_mode" => @mode, "state" => state
-        }))
+
+        response =
+          get(
+            conn,
+            path(c, "openid", %{
+              "prompt" => "none",
+              "response_mode" => @mode,
+              "state" => state
+            })
+          )
+
         uri = response |> redirected_to() |> URI.parse()
         query = URI.decode_query(uri.query)
         returned = if @mode == "fragment", do: URI.decode_query(uri.fragment), else: query
 
         assert query["destination"] == "inbox"
         assert returned["state"] == state
-        assert returned["error"] == if(@signed_in?, do: "consent_required", else: "login_required")
+
+        assert returned["error"] ==
+                 if(@signed_in?, do: "consent_required", else: "login_required")
+
         refute Map.has_key?(returned, "code")
         refute Map.has_key?(returned, "access_token")
         refute Bonfire.OpenID.Web.Consent.consented?(c.user, c.client.id, "openid profile")
@@ -97,9 +128,17 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
     @tag callback_query: "?destination=inbox&filter=a%26b"
     test "denial honors explicit #{response_mode} mode for #{response_type}", c do
       state = "denied & + / café"
-      {:ok, view, _} = live(c.conn, path(c, "oauth", %{
-        "response_type" => @response_type, "response_mode" => @response_mode, "state" => state
-      }))
+
+      {:ok, view, _} =
+        live(
+          c.conn,
+          path(c, "oauth", %{
+            "response_type" => @response_type,
+            "response_mode" => @response_mode,
+            "state" => state
+          })
+        )
+
       assert {:error, {:redirect, %{to: to}}} =
                view |> element("[data-role=oauth_consent_deny]") |> render_click()
 
@@ -108,19 +147,33 @@ defmodule Bonfire.OpenID.ConsentSideEffectsReviewTest do
       assert callback_query["destination"] == "inbox"
       assert callback_query["filter"] == "a&b"
 
-      returned = if @response_mode == "fragment", do: URI.decode_query(uri.fragment), else: callback_query
+      returned =
+        if @response_mode == "fragment", do: URI.decode_query(uri.fragment), else: callback_query
+
       assert returned["error"] == "access_denied"
       assert returned["state"] == state
       refute Map.has_key?(returned, "code")
       refute Map.has_key?(returned, "access_token")
-      if @response_mode == "fragment", do: refute(Map.has_key?(callback_query, "error")), else: assert(is_nil(uri.fragment))
+
+      if @response_mode == "fragment",
+        do: refute(Map.has_key?(callback_query, "error")),
+        else: assert(is_nil(uri.fragment))
     end
   end
 
   defp path(c, protocol, extra) do
-    params = Map.merge(%{"client_id" => c.client.id, "redirect_uri" => c.callback,
-      "scope" => if(protocol == "openid", do: "openid profile", else: "read"),
-      "response_type" => "code", "state" => "side-review"}, extra)
+    params =
+      Map.merge(
+        %{
+          "client_id" => c.client.id,
+          "redirect_uri" => c.callback,
+          "scope" => if(protocol == "openid", do: "openid profile", else: "read"),
+          "response_type" => "code",
+          "state" => "side-review"
+        },
+        extra
+      )
+
     "/#{protocol}/authorize?" <> URI.encode_query(params)
   end
 end

@@ -95,10 +95,21 @@ defmodule Bonfire.OpenID.Web.OauthConsentLive do
     uri = data |> Map.fetch!(:redirect_uri) |> URI.parse()
 
     case Map.get(data, :response_mode) do
-      "fragment" -> Map.put(uri, :fragment, URI.encode_query(query))
-      "query" -> Bonfire.Common.URIs.append_params_uri(uri, query)
+      "fragment" ->
+        Map.put(uri, :fragment, URI.encode_query(query))
+
+      "query" ->
+        Bonfire.Common.URIs.append_params_uri(uri, query)
+
       _ ->
-        if Map.get(data, :response_type) in ["token", "id_token", "id_token token", "code id_token", "code token", "code id_token token"] do
+        if Map.get(data, :response_type) in [
+             "token",
+             "id_token",
+             "id_token token",
+             "code id_token",
+             "code token",
+             "code id_token token"
+           ] do
           Map.put(uri, :fragment, URI.encode_query(query))
         else
           Bonfire.Common.URIs.append_params_uri(uri, query)

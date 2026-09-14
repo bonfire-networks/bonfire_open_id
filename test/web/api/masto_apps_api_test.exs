@@ -30,7 +30,9 @@ defmodule Bonfire.OpenID.Web.MastoAppsApiTest do
     assert ClientApps.get_by_id(second["client_id"])
   end
 
-  test "a registration with the same name preserves each application's callback", %{params: params} do
+  test "a registration with the same name preserves each application's callback", %{
+    params: params
+  } do
     first = register_app(params)
     other_callback = "https://other-client.example/callback"
 

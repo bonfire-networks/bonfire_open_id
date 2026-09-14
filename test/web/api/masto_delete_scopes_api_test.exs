@@ -49,6 +49,7 @@ defmodule Bonfire.OpenID.Web.MastoDeleteScopesApiTest do
 
   test "a session cannot bypass a read-only token", context do
     token = create_token!(context, "read")
+
     context
     |> delete_session_conn()
     |> put_req_header("authorization", "Bearer #{token.value}")
@@ -64,6 +65,7 @@ defmodule Bonfire.OpenID.Web.MastoDeleteScopesApiTest do
 
   test "a session cannot turn an app-only token into a user token", context do
     token = create_token!(%{context | user: nil}, "write:statuses")
+
     context
     |> delete_session_conn()
     |> put_req_header("authorization", "Bearer #{token.value}")
@@ -77,7 +79,9 @@ defmodule Bonfire.OpenID.Web.MastoDeleteScopesApiTest do
   end
 
   test "preserves session-only deletion", context do
-    response = context |> delete_session_conn() |> delete_status(context.post) |> json_response(200)
+    response =
+      context |> delete_session_conn() |> delete_status(context.post) |> json_response(200)
+
     assert response["id"] == context.post.id
     assert {:error, _} = Posts.read(context.post.id, current_user: context.user)
   end
