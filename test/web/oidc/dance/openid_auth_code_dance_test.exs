@@ -23,7 +23,7 @@ defmodule Bonfire.OpenID.OIDCAuthCodeDanceTest do
   test "can login using OpenID Connect with authorization code flow + fetch cross-instance user info",
        context do
     test_oidc_flow(context, %{
-      response_type: "authorization_code",
+      response_type: "code",
       scope: "openid profile email identity data:public",
       flow_type: :authorization_code,
       test_cross_instance: true

@@ -22,7 +22,7 @@ defmodule Bonfire.OpenID.OIDCPKCEDanceTest do
 
   test "can login using OpenID Connect with PKCE flow", context do
     test_oidc_flow(context, %{
-      response_type: "authorization_code",
+      response_type: "code",
       scope: "openid profile email identity data:public",
       flow_type: :authorization_code_pkce,
       client_name: "PKCE Test Client"

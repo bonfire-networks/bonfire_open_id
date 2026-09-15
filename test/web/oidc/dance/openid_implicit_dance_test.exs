@@ -22,7 +22,7 @@ defmodule Bonfire.OpenID.OIDCImplicitDanceTest do
 
   test "can login using OpenID Connect with implicit flow", context do
     test_oidc_flow(context, %{
-      response_type: "implicit",
+      response_type: "id_token token",
       scope: "openid identity data:public",
       flow_type: :implicit
     })

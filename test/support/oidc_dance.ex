@@ -122,7 +122,7 @@ defmodule Bonfire.OpenID.OIDCDance do
       client_id: client.id,
       client_secret: client.secret,
       discovery_document_uri: discovery_document_uri,
-      response_type: opts[:response_type] || "authorization_code",
+      response_type: opts[:response_type] || "code",
       scope: opts[:scope] || "openid profile email identity data:public"
     ]
 
@@ -502,7 +502,7 @@ defmodule Bonfire.OpenID.OIDCDance do
         client_id: client_id,
         client_secret: client_secret,
         discovery_document_uri: discovery_document_uri,
-        response_type: "authorization_code",
+        response_type: "code",
         scope: "openid profile email identity data:public"
       ]
     ]

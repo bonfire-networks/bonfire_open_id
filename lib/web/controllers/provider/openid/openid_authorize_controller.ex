@@ -47,6 +47,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
     query_params =
       Plug.Conn.Query.decode(query)
       |> debug("from_query_string query_params")
+      |> Bonfire.OpenID.Provider.normalize_response_type()
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
       |> add_unsigned_request()
       |> debug("from_query_string transformed query_params")

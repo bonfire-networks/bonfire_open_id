@@ -10,12 +10,9 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
   # boruta 3.0: AuthorizeResponse `code`/`access_token` are %Token{} structs (read via `.value`)
   alias Boruta.Oauth.Token
   alias Bonfire.OpenID.Web.Oauth.AuthorizeController
+  alias Bonfire.UI.Common.Testing.Helpers
 
   setup :verify_on_exit!
-
-  defmodule User do
-    defstruct id: 1, email: "test@test.test"
-  end
 
   setup do
     conn =
@@ -24,12 +21,21 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
         %{}
       )
 
-    # These tests mock boruta's `authorize` directly — pre-grant consent for the fake
+    account = Helpers.fake_account!()
+
+    # loaded the way `LoadCurrentUser` loads it for a real request, so the account is already
+    # preloaded: `Seen.normalize_subject!/1`, which `get_user/1` reaches for `last_login_at`,
+    # flags both a current_user with no account and one whose account it has to go and fetch
+    current_user =
+      Helpers.fake_user!(account)
+      |> then(&Bonfire.UI.Me.LivePlugs.LoadCurrentUser.get_current(&1.id, account.id))
+
+    # These tests mock boruta's `authorize` directly — pre-grant consent for the
     # current_user so the controller skips the consent screen (`preauthorize`) and
     # exercises the mocked `authorize` path.
-    Bonfire.OpenID.Web.Consent.remember_consent_all(%User{})
+    Bonfire.OpenID.Web.Consent.remember_consent_all(current_user)
 
-    {:ok, conn: conn}
+    {:ok, conn: conn, current_user: current_user, account: account}
   end
 
   describe "authorize/2" do
@@ -37,8 +43,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       assert_authorize_redirected_to_login(conn)
     end
 
-    test "returns an error page", %{conn: conn} do
-      current_user = %User{}
+    test "returns an error page", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       error = %Error{
@@ -57,8 +62,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
       assert html_response(conn, 400) =~ ~r/Error description/
     end
 
-    test "returns an error in fragment", %{conn: conn} do
-      current_user = %User{}
+    test "returns an error in fragment", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       error = %Error{
@@ -80,8 +84,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
                "http://redirect.uri#error=unknown_error&error_description=Error+description"
     end
 
-    test "returns an error in query", %{conn: conn} do
-      current_user = %User{}
+    test "returns an error in query", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       error = %Error{
@@ -103,8 +106,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
                "http://redirect.uri?error=unknown_error&error_description=Error+description"
     end
 
-    test "redirects with an access_token", %{conn: conn} do
-      current_user = %User{}
+    test "redirects with an access_token", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       response = %AuthorizeResponse{
@@ -127,8 +129,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
              ]
     end
 
-    test "redirects with an access_token and a state", %{conn: conn} do
-      current_user = %User{}
+    test "redirects with an access_token and a state", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       response = %AuthorizeResponse{
@@ -153,8 +154,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
              ]
     end
 
-    test "redirects with an code", %{conn: conn} do
-      current_user = %User{}
+    test "redirects with an code", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       response = %AuthorizeResponse{
@@ -174,8 +174,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
                "http://redirect.uri?code=code"
     end
 
-    test "preserves requested scope without forcing offline_access", %{conn: conn} do
-      current_user = %User{}
+    test "preserves requested scope without forcing offline_access", %{conn: conn, current_user: current_user} do
 
       conn =
         conn
@@ -203,8 +202,7 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
                "http://redirect.uri?code=code"
     end
 
-    test "redirects with an code and a state", %{conn: conn} do
-      current_user = %User{}
+    test "redirects with an code and a state", %{conn: conn, current_user: current_user} do
       conn = assign(conn, :current_user, current_user)
 
       response = %AuthorizeResponse{

@@ -22,7 +22,7 @@ defmodule Bonfire.OpenID.JwksUserinfoDanceTest do
 
   test "can verify JWKS and Userinfo endpoints via authorization code flow", context do
     test_jwks_and_userinfo_flow(context, %{
-      response_type: "authorization_code",
+      response_type: "code",
       scope: "openid profile email identity data:public",
       flow_type: :authorization_code
     })

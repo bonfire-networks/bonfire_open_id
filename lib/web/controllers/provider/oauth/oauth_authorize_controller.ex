@@ -82,6 +82,7 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
       |> debug("from_query_string query")
       |> Plug.Conn.Query.decode()
       |> debug("from_query_string decoded")
+      |> Bonfire.OpenID.Provider.normalize_response_type()
       |> Bonfire.OpenID.Provider.ClientApps.maybe_transform_client_id()
       |> debug("query_params from_query_string")
 

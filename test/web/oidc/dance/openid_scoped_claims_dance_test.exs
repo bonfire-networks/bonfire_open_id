@@ -22,7 +22,7 @@ defmodule Bonfire.OpenID.OIDCScopedClaimsDanceTest do
 
   test "returns correct claims for different scopes", context do
     test_oidc_flow(context, %{
-      response_type: "authorization_code",
+      response_type: "code",
       scope: "openid profile email identity data:public",
       flow_type: :authorization_code,
       client_name: "Test Client with Full Scopes",
@@ -32,7 +32,7 @@ defmodule Bonfire.OpenID.OIDCScopedClaimsDanceTest do
 
   test "respects limited scopes in claims", context do
     test_oidc_flow(context, %{
-      response_type: "authorization_code",
+      response_type: "code",
       scope: "openid identity",
       flow_type: :authorization_code,
       client_name: "Test Client with Limited Scopes",

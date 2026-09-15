@@ -51,7 +51,7 @@ defmodule Bonfire.OpenID.OIDCPKCEPublicClientDanceTest do
     test_oidc_flow(
       context |> Map.put(:client, public_client) |> Map.put(:redirect_uri, redirect_uri),
       %{
-        response_type: "authorization_code",
+        response_type: "code",
         scope: "openid identity data:public",
         flow_type: :authorization_code_pkce,
         client_name: "Public PKCE Client",
