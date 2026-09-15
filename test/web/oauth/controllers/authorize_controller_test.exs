@@ -174,8 +174,10 @@ defmodule Bonfire.OpenID.Web.Controllers.Oauth.AuthorizeControllerTest do
                "http://redirect.uri?code=code"
     end
 
-    test "preserves requested scope without forcing offline_access", %{conn: conn, current_user: current_user} do
-
+    test "preserves requested scope without forcing offline_access", %{
+      conn: conn,
+      current_user: current_user
+    } do
       conn =
         conn
         |> assign(:current_user, current_user)
