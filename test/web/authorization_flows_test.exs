@@ -137,6 +137,16 @@ defmodule Bonfire.OpenID.Web.AuthorizationFlowsTest do
       assert response.status in [400, 401, 403, 422]
     end
 
+    # A stale session still has `:current_user_id`, so LoadCurrentUser assigns `current_user: nil` rather than leaving the key out, and the request reaches the resource owner lookup as if someone were signed in.
+    test "#{protocol}: a session pointing at a user that no longer exists lands on login", c do
+      response =
+        conn(user: Needle.UID.generate())
+        |> get(authorization_path(@protocol, c.client))
+
+      assert response.status == 302
+      assert URI.parse(redirected_to(response)).path == Bonfire.Common.URIs.path(:login)
+    end
+
     @tag pkce: true
     test "#{protocol}: PKCE code exchange rejects the wrong verifier and accepts the correct one",
          c do

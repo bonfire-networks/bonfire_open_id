@@ -236,6 +236,7 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
         e ->
           error(e, "Could not find current user")
+          %ResourceOwner{sub: nil}
       end
     end
   end
