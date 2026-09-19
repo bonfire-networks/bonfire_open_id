@@ -51,6 +51,26 @@ defmodule Bonfire.OpenID.Provider.Tokens do
   def get_for_user(_, _), do: {:error, :not_found}
 
   @doc """
+  Fetches one of the user's tokens by id, only while it is still usable.
+
+  Where `get_for_user/2` answers "what was this token", this answers "may we still act on it": anything that needs the token's own value, such as a push notification that carries it so a client can call back, must stop the moment the authorisation is revoked or expires. Asking at the point of use is what makes revocation take effect with nothing wired to it.
+  """
+  def get_active_for_user(user_id, token_id) when is_binary(user_id) and is_binary(token_id) do
+    # token ids are Boruta UUIDs; a malformed id is simply "not found" (avoid a cast crash)
+    with {:ok, uuid} <- Ecto.UUID.cast(token_id),
+         %Token{} = token <-
+           active_tokens_query(user_id)
+           |> where([t], t.id == ^uuid)
+           |> repo().one() do
+      {:ok, token}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def get_active_for_user(_, _), do: {:error, :not_found}
+
+  @doc """
   Revokes (invalidates) one of the user's tokens, making it immediately unusable.
 
   Delegates to Boruta's `revoke/1` so the token cache is invalidated too, then
