@@ -354,17 +354,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
           # TODO: make this configurable per-provider
           with {:ok, conn} <-
                  Bonfire.UI.Me.SignupController.attempt(conn, %{openid_email: email}, %{},
-                   must_confirm?: false
+                   must_confirm?: false,
+                   # so the signup rules can tell which sign-in service this came from (e.g. a trusted one)
+                   open_id_provider: {provider, nil}
                  )
                  |> info("attempted creating an account") do
             conn
           else
-            other ->
-              error(other)
-
-              raise Bonfire.Fail,
-                    {:invalid_credentials,
-                     l("Could not find or create an account for you, sorry.")}
+            other -> signup_refused(conn, other)
           end
       end
     end
@@ -381,6 +378,36 @@ defmodule Bonfire.OpenID.Web.ClientController do
     #       )
     #     )
   end
+
+  @doc false
+  # A sign-in through an external service that ends without a local account because one can't be created. Back to the login page with the instance's signup policy (public), never saying whether an account exists for this email; rather than an error page, which also replays the callback on refresh.
+  def signup_refused(conn, error) do
+    error(error, "Could not create an account from an SSO sign-in")
+
+    conn
+    |> assign_flash(:error, signup_refused_message(error))
+    |> redirect_to("/login")
+  end
+
+  defp signup_refused_message({:error, inner}), do: signup_refused_message(inner)
+
+  defp signup_refused_message(%Ecto.Changeset{errors: errors}),
+    do: signup_refused_message(errors[:form])
+
+  defp signup_refused_message({"invite_only", _}),
+    do: l("New accounts on this instance need an invite. Ask an admin for one.")
+
+  defp signup_refused_message({"signup_not_allowed", _}),
+    do:
+      l(
+        "New accounts on this instance are limited to certain email domains or sign-in services. If yours isn't eligible, ask an admin for an invite."
+      )
+
+  defp signup_refused_message(_),
+    do:
+      l(
+        "We couldn't sign you in with that service. Please try again, or contact the instance admins."
+      )
 
   defp handle_unknown_account_with_no_email(conn, provider, params) do
     debug(params, "no existing account found, and no email provided")
