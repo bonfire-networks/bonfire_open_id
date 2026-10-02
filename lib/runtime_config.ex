@@ -71,7 +71,10 @@ defmodule Bonfire.OpenID.RuntimeConfig do
     # TODO: use `Bonfire.Common.EnvConfig` to handle configuring many providers via ENV https://github.com/bonfire-networks/bonfire-app/issues/1082
 
     # connect as a client to an OpenID Connect provider https://yourinstance.tld/openid/client/openid_1
-    if main_discovery_document_uri = System.get_env("OPENID_1_DISCOVERY") do
+    # an explicit discovery URL wins; otherwise derive it from the issuer
+    if main_discovery_document_uri =
+         System.get_env("OPENID_1_DISCOVERY") ||
+           Bonfire.OpenID.Client.discovery_document_uri(System.get_env("OPENID_1_ISSUER")) do
       config :bonfire_open_id, :openid_connect_providers,
         openid_1: [
           display_name: System.get_env("OPENID_1_DISPLAY_NAME", l("Single sign-on")),
@@ -104,7 +107,7 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         orcid: [
           display_name: "ORCID",
           # only_supports_login: true,
-          discovery_document_uri: "#{base_uri}/.well-known/openid-configuration",
+          discovery_document_uri: Bonfire.OpenID.Client.discovery_document_uri(base_uri),
           client_id: orcid_client_id,
           client_secret: Bonfire.Common.EnvSecrets.env_or_file("ORCID_CLIENT_SECRET"),
           response_type: "code",

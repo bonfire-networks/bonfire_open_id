@@ -18,7 +18,8 @@ defmodule Bonfire.OpenID.Web.Openid.UserinfoController do
              Boruta.Oauth.Token.userinfo(%Boruta.Oauth.Token{
                resource_owner: resource_owner,
                type: :access_token,
-               scope: nil
+               # a bearer request reaches this branch too, since the authorization plug assigns a current_user from the token: without its scope, no scope-gated claim can ever be returned here
+               scope: e(conn.assigns, :current_token, :scope, nil)
              })
              |> debug("basic userinfo"),
            %{} = client <- Bonfire.OpenID.Provider.ClientApps.init_test_client_app() do

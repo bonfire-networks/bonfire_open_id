@@ -275,6 +275,69 @@ defmodule Bonfire.OpenID.Web.AuthorizationFlowsTest do
     assert result.status == 401
   end
 
+  test "openid: the email claim is returned only when the email scope was granted", c do
+    address =
+      c.account
+      |> Bonfire.Common.Repo.maybe_preload(:email)
+      |> Map.get(:email)
+      |> Map.get(:email_address)
+
+    assert is_binary(address)
+
+    granted = userinfo(c, "openid profile email")
+    assert granted["email"] == address
+    assert is_boolean(granted["email_verified"])
+
+    not_granted = userinfo(c, "openid profile")
+    refute Map.has_key?(not_granted, "email")
+    refute Map.has_key?(not_granted, "email_verified")
+  end
+
+  test "openid: profile claims follow the profile scope, with Mastodon read treated as profile",
+       c do
+    display_name =
+      c.user |> Bonfire.Common.Repo.maybe_preload(:profile) |> Map.get(:profile) |> Map.get(:name)
+
+    handle =
+      c.user
+      |> Bonfire.Common.Repo.maybe_preload(:character)
+      |> Map.get(:character)
+      |> Map.get(:username)
+
+    # so the assertions below cannot pass by comparing two nils, or by the handle standing in for the display name
+    assert is_binary(display_name)
+    assert is_binary(handle)
+    refute display_name == handle
+
+    with_profile = userinfo(c, "openid profile")
+    assert with_profile["name"] == display_name
+    assert with_profile["preferred_username"] == handle
+
+    assert userinfo(c, "openid read")["preferred_username"] == handle
+
+    bare = userinfo(c, "openid")
+    # a real response, so the refutations are not passing on an empty body
+    assert bare["sub"]
+    refute Map.has_key?(bare, "name")
+    refute Map.has_key?(bare, "preferred_username")
+  end
+
+  defp userinfo(c, scope) do
+    code =
+      approve(c.conn, authorization_path("openid", c.client, %{"scope" => scope}))
+      |> URI.parse()
+      |> Map.fetch!(:query)
+      |> URI.decode_query()
+      |> Map.fetch!("code")
+
+    token = exchange("openid", c.client, code)
+
+    build_conn()
+    |> put_req_header("authorization", "Bearer " <> token["access_token"])
+    |> get("/openid/userinfo")
+    |> json_response(200)
+  end
+
   test "openid: prompt none does not display login or consent to a logged-out user", c do
     response = conn() |> get(authorization_path("openid", c.client, %{"prompt" => "none"}))
     callback = response |> redirected_to() |> URI.parse()

@@ -16,6 +16,18 @@ defmodule Bonfire.OpenID.Client do
   end
 
   @doc """
+  Where a provider's OpenID Connect discovery document lives, given its issuer. OpenID Connect Discovery 1.0 defines this as the issuer plus `/.well-known/openid-configuration`, so an issuer is all a provider has to publish. Returns nil for a blank issuer, so a caller can `||` it with an explicitly configured URL.
+
+      iex> Bonfire.OpenID.Client.discovery_document_uri("https://provider.example")
+      "https://provider.example/.well-known/openid-configuration"
+  """
+  def discovery_document_uri(issuer) when is_binary(issuer) and issuer != "" do
+    String.trim_trailing(issuer, "/") <> "/.well-known/openid-configuration"
+  end
+
+  def discovery_document_uri(_), do: nil
+
+  @doc """
   All redirect URIs this instance may use as an OAuth client (across all configured providers).
   """
   def all_redirect_uris do
