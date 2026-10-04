@@ -37,6 +37,17 @@ defmodule Bonfire.OpenID.Provider.CIMDTest do
       assert {:error, msg} = CIMD.fetch("https://127.0.0.1/metadata")
       assert msg =~ "blocked"
     end
+
+    # which also reaches the server itself on most systems
+    test "rejects 0.0.0.0" do
+      assert {:error, msg} = CIMD.fetch("https://0.0.0.0/metadata")
+      assert msg =~ "blocked"
+    end
+
+    test "rejects an IPv6 loopback" do
+      assert {:error, msg} = CIMD.fetch("https://[::1]/metadata")
+      assert msg =~ "blocked"
+    end
   end
 
   describe "validate_doc/2" do

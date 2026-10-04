@@ -8,21 +8,9 @@ defmodule Bonfire.OpenID.Provider.CIMD do
   """
 
   import Untangle
-  import Bitwise
 
   @timeout_ms 10_000
   @max_body_bytes 5 * 1024
-
-  # Private IP ranges to block (SSRF protection)
-  @blocked_ranges [
-    {{127, 0, 0, 0}, 8},
-    {{10, 0, 0, 0}, 8},
-    {{172, 16, 0, 0}, 12},
-    {{192, 168, 0, 0}, 16},
-    {{169, 254, 0, 0}, 16},
-    {{0, 0, 0, 0, 0, 0, 0, 1}, 128},
-    {{0xFE80, 0, 0, 0, 0, 0, 0, 0}, 10}
-  ]
 
   @doc """
   Returns true if the client_id looks like a CIMD URL (HTTPS).
@@ -51,38 +39,20 @@ defmodule Bonfire.OpenID.Provider.CIMD do
       else: {:error, "CIMD client_id must be an HTTPS URL"}
   end
 
+  # every address the host resolves to (IPv4 and IPv6) must be public; the fetch also checks each redirect hop
   defp validate_ssrf(url) do
-    with {:ok, %{host: host}} <- URI.new(url),
-         {:ok, addresses} <- :inet.getaddrs(String.to_charlist(host), :inet) do
-      if Enum.any?(addresses, &ip_blocked?/1),
-        do: {:error, "CIMD client_id resolves to a blocked IP address"},
-        else: :ok
-    else
-      _ -> {:error, "Could not resolve CIMD client_id host"}
+    case Bonfire.Common.HTTP.SSRF.check(url) do
+      :ok -> :ok
+      {:error, _} -> {:error, "CIMD client_id resolves to a blocked address"}
     end
   end
-
-  defp ip_blocked?(ip) do
-    Enum.any?(@blocked_ranges, fn {range_ip, prefix_len} ->
-      ip_in_range?(ip, range_ip, prefix_len)
-    end)
-  end
-
-  defp ip_in_range?(ip, range_ip, prefix_len)
-       when tuple_size(ip) == 4 and tuple_size(range_ip) == 4 do
-    mask = bnot(bsr(0xFFFFFFFF, prefix_len)) &&& 0xFFFFFFFF
-    (ip_to_int32(ip) &&& mask) == (ip_to_int32(range_ip) &&& mask)
-  end
-
-  defp ip_in_range?(_, _, _), do: false
-
-  defp ip_to_int32({a, b, c, d}), do: bsl(a, 24) + bsl(b, 16) + bsl(c, 8) + d
 
   defp do_fetch(url) do
     case Req.get(url,
            headers: [accept: "application/json"],
            receive_timeout: @timeout_ms,
-           max_redirects: 3
+           max_redirects: 3,
+           plugins: [&Bonfire.Common.HTTP.SSRF.attach/1]
          ) do
       {:ok, %{status: 200, body: body}} when is_map(body) ->
         {:ok, body}
@@ -99,6 +69,9 @@ defmodule Bonfire.OpenID.Provider.CIMD do
 
       {:ok, %{status: status}} ->
         {:error, "CIMD fetch returned HTTP #{status}"}
+
+      {:error, %ReqSSRF.BlockedError{}} ->
+        {:error, "CIMD client_id redirects to a blocked address"}
 
       {:error, reason} ->
         warn(reason, "CIMD fetch failed for #{url}")

@@ -138,7 +138,10 @@ defmodule Bonfire.OpenID.Web.ClientController do
 
   defp user_info_body(userinfo_uri, access_token) do
     if userinfo_uri do
-      Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}])
+      # an endpoint of an identity provider the admin configured, which may be on a private address
+      Bonfire.Common.HTTP.get(userinfo_uri, [{"authorization", "Bearer #{access_token}"}],
+        ssrf_check: false
+      )
     else
       {:ok, %{body: "{}"}}
     end
@@ -174,7 +177,9 @@ defmodule Bonfire.OpenID.Web.ClientController do
              [
                {"content-type", "application/x-www-form-urlencoded"},
                {"accept", "application/json"}
-             ]
+             ],
+             # an endpoint of an identity provider the admin configured, which may be on a private address
+             ssrf_check: false
            )
            |> debug("token_result"),
          #  Bonfire.Common.HTTP.post("#{access_token_uri}?#{query}", ""),
