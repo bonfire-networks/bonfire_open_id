@@ -165,9 +165,9 @@ defmodule Bonfire.OpenID.Web.Openid.AuthorizeController do
 
   defp store_user_return_to(conn, url \\ nil) do
     # remove prompt and max_age params affecting redirections
+    # in its own short-lived cookie (`set_go_after/2`), so an abandoned authorization doesn't resume at a later sign-in
     conn
-    |> put_session(
-      :go,
+    |> set_go_after(
       (url ||
          current_path(conn, conn.query_params))
       |> String.replace(~r/prompt=(login|none)/, "")

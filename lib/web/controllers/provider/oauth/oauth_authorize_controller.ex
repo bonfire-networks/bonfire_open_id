@@ -209,11 +209,9 @@ defmodule Bonfire.OpenID.Web.Oauth.AuthorizeController do
   end
 
   defp store_user_return_to(conn, url \\ nil) do
+    # in its own short-lived cookie (`set_go_after/2`), so an abandoned authorization doesn't resume at a later sign-in
     conn
-    |> put_session(
-      :go,
-      url || current_path(conn, conn.query_params)
-    )
+    |> set_go_after(url || current_path(conn, conn.query_params))
   end
 
   def redirect_to_pick_profile(conn, go_after_url \\ nil) do

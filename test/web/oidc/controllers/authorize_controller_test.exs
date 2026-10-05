@@ -15,9 +15,14 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.AuthorizeControllerTest do
   setup :verify_on_exit!
 
   setup do
+    # with the endpoint's key, as a request through the endpoint has it: the controller saves where to go after signing in in an encrypted cookie
     conn =
       init_test_session(
-        %{build_conn() | query_params: %{}},
+        %{
+          build_conn()
+          | query_params: %{},
+            secret_key_base: Bonfire.Common.Config.endpoint_module().config(:secret_key_base)
+        },
         %{}
       )
 
