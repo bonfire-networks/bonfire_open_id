@@ -229,28 +229,31 @@ defmodule Bonfire.OpenID.Web.ClientController do
     # provider_config = provider_config
     # |> Map.put(:redirect_uri, "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}")
 
-    error_msg = l("An unknown error occurred with OpenID Connect.")
     # Map.merge(params, %{"scope"=> "openid /read-public"})
-    with {:ok, tokens} <-
-           OpenIDConnect.fetch_tokens(
-             provider_config,
-             Enums.input_to_atoms(params)
-             |> Map.put(:redirect_uri, openid_callback_url(provider))
-             |> info("prepared_params")
-           )
-           |> info("fetched_tokens"),
-         {:ok, claims} <-
-           OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims") do
+    # each step is tagged so a failure names which one it was, rather than one message for both
+    with {:exchange, {:ok, tokens}} <-
+           {:exchange,
+            OpenIDConnect.fetch_tokens(
+              provider_config,
+              Enums.input_to_atoms(params)
+              |> Map.put(:redirect_uri, openid_callback_url(provider))
+              |> info("prepared_params")
+            )
+            |> info("fetched_tokens")},
+         {:verify, {:ok, claims}} <-
+           {:verify,
+            OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims")} do
       process_external_auth(conn, provider, provider_config, Enum.into(claims, tokens))
     else
-      {:error, :fetch_tokens, %{body: "{" <> _ = body}} ->
-        process_body_error(conn, body, error_msg)
+      {:exchange, error} ->
+        exchange_error(conn, error)
 
-      {_, body} ->
-        process_body_error(conn, body, error_msg)
-
-      other ->
-        process_body_error(conn, other, error_msg)
+      {:verify, error} ->
+        process_body_error(
+          conn,
+          error,
+          l("The identity returned by the sign-in service could not be verified.")
+        )
     end
   end
 
@@ -264,8 +267,43 @@ defmodule Bonfire.OpenID.Web.ClientController do
     end
   end
 
+  # back through the clauses above, so a JSON body wrapped in a tuple still gets decoded and its `error_description` surfaced
   defp process_body_error(conn, {_, body}, error_msg) do
-    process_and_maybe_raise_error(conn, body, error_msg)
+    process_body_error(conn, body, error_msg)
+  end
+
+  defp exchange_error(conn, error) do
+    case error_body(error) do
+      %{"error" => "invalid_grant"} = body -> refused_code(conn, body)
+      body -> process_body_error(conn, body, l("Could not complete sign-in with that service."))
+    end
+  end
+
+  # The provider's response, decoded where it is JSON: `{:error, {status, body}}` is what `OpenIDConnect.fetch_tokens/2` returns on a non-2xx, and `{:error, :fetch_tokens, %{body: body}}` the shape of older versions.
+  defp error_body({:error, {_status, body}}), do: error_body(body)
+  defp error_body({:error, :fetch_tokens, %{body: body}}), do: error_body(body)
+
+  defp error_body(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} -> decoded
+      _ -> body
+    end
+  end
+
+  defp error_body(other), do: other
+
+  # The provider refused the code, usually because it was already exchanged: a reload, a back-then-forward or a prefetch replays the callback, and codes are single-use. Not a server fault, so no error page, which would also replay the callback on refresh. A misconfigured redirect URI gets the same refusal, hence the log.
+  defp refused_code(conn, body) do
+    warn(body, "The sign-in service refused the authorization code")
+
+    if current_user(conn) do
+      # already signed in, so an earlier visit with this code worked
+      redirect_to(conn, "/")
+    else
+      conn
+      |> assign_flash(:error, l("That sign-in could not be completed. Please sign in again."))
+      |> redirect_to("/login")
+    end
   end
 
   defp process_body_error(conn, body, error_msg) do

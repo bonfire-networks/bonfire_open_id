@@ -13,12 +13,16 @@ defmodule Bonfire.OpenID.OIDCDance do
   alias Bonfire.Common.TestInstanceRepo
   alias Bonfire.OpenID.Provider.ClientApps
 
+  # One discovery URI per client. `openid_connect` caches a discovery document together with its JWKS under the URI it was fetched from, and every test signs with a newly created client's key, so a URI shared between tests would hand one test's key set to the next. Its cache cannot be cleared from outside: `OpenIDConnect.Document.Cache.flush/1` returns the contents without removing them. The provider ignores the query string.
+  def per_client_discovery_uri(instance, client_id),
+    do: "#{instance}/.well-known/openid-configuration?client=#{client_id}"
+
   def setup do
     client_id = Faker.UUID.v4()
     main_instance = "http://localhost:4000"
     secondary_instance = "http://localhost:4002"
     redirect_uri = "#{main_instance}/openid/client/" <> client_id
-    discovery_document_uri = "#{secondary_instance}/.well-known/openid-configuration"
+    discovery_document_uri = per_client_discovery_uri(secondary_instance, client_id)
 
     # Create client with OpenID Connect scopes
     client =
@@ -493,7 +497,7 @@ defmodule Bonfire.OpenID.OIDCDance do
         context
       ) do
     # Configure provider with dynamically registered client
-    discovery_document_uri = "#{secondary_instance}/.well-known/openid-configuration"
+    discovery_document_uri = per_client_discovery_uri(secondary_instance, client_id)
 
     # Use a consistent provider key that won't generate a new unique number
     provider_config = [
