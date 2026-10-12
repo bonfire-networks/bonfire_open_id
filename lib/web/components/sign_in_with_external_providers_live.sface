@@ -36,14 +36,13 @@
                 <#Icon iconify="academicons:orcid" class="w-8 h-8" />
                 <span class="flex-1 text-left">{l("Sign in with ORCID")}</span>
               </LinkLive>
-              <!-- Open the modal using ID.showModal() method -->
-
+              {!-- opens the dialog right after it rather than one found by id: a page can show this component more than once (the remote interaction page has both the login and the sign-up form), and a fixed id is then a duplicate --}
               <button
                 type="button"
                 class="btn btn-sm btn-circle btn-info btn-soft btn-square"
-                onclick="orcid_info.showModal()"
+                onclick="this.nextElementSibling.showModal()"
               ><#Icon iconify="ph:question-mark-duotone" /></button>
-              <dialog id="orcid_info" class="modal">
+              <dialog class="modal">
                 <div class="modal-box">
                   <h3 class="text-lg font-bold">{l("What is ORCID ID?")}</h3>
                   <p class="py-4">{l(
