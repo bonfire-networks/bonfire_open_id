@@ -92,16 +92,26 @@ defmodule Bonfire.OpenID.Web.MagicLinkAuthorizationTest do
     end
   end
 
-  test "a consumed magic link cannot authenticate a new browser session", c do
+  test "a used magic link works again only within its grace period, never after it", c do
     email =
       c.account.email |> Bonfire.Data.Identity.Email.put_token() |> Bonfire.Common.Repo.update!()
 
     go = "/oauth/authorize?" <> URI.encode_query(params(c, "oauth"))
-    path = "/login/forgot-password/#{email.confirm_token}?go=#{URI.encode_www_form(go)}"
-    first = get(conn(), path)
+    path = "/login/email/#{email.confirm_token}?go=#{URI.encode_www_form(go)}"
+    first = post(conn(), path)
     assert first.status == 200
     assert html_response(first, 200) =~ "oauth_consent"
-    second = get(conn(), path)
+
+    # the grace period: a double click, or a mail scanner running first, doesn't lock the person out
+    within_grace = post(conn(), path)
+    assert html_response(within_grace, 200) =~ "oauth_consent"
+
+    # once it is over, a used link can't sign a new browser session in
+    Bonfire.Common.Repo.get!(Bonfire.Data.Identity.Email, c.account.id)
+    |> Ecto.Changeset.change(confirm_until: DateTime.add(DateTime.utc_now(), -60))
+    |> Bonfire.Common.Repo.update!()
+
+    second = post(conn(), path)
     assert html_response(second, 200) =~ "This sign-in link is invalid or has expired"
     refute html_response(second, 200) =~ "data-role=\"oauth_consent\""
     refute Bonfire.Common.Utils.current_user(second)
@@ -122,6 +132,6 @@ defmodule Bonfire.OpenID.Web.MagicLinkAuthorizationTest do
       c.account.email |> Bonfire.Data.Identity.Email.put_token() |> Bonfire.Common.Repo.update!()
 
     go = "/#{protocol}/authorize?" <> URI.encode_query(params)
-    conn() |> get("/login/forgot-password/#{email.confirm_token}?go=#{URI.encode_www_form(go)}")
+    conn() |> post("/login/email/#{email.confirm_token}?go=#{URI.encode_www_form(go)}")
   end
 end

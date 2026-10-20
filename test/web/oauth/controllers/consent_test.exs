@@ -97,9 +97,7 @@ defmodule Bonfire.OpenID.Web.Oauth.ConsentTest do
 
     login_conn =
       conn()
-      |> get(
-        "/login/forgot-password/#{email.confirm_token}?go=#{URI.encode_www_form(authorization_path)}"
-      )
+      |> post("/login/email/#{email.confirm_token}?go=#{URI.encode_www_form(authorization_path)}")
 
     {:ok, view, _html} = live(login_conn)
 

@@ -76,7 +76,7 @@ defmodule Bonfire.OpenID.Web.AuthorizationFlowsTest do
 
       login =
         conn()
-        |> get("/login/forgot-password/#{email.confirm_token}?go=#{URI.encode_www_form(path)}")
+        |> post("/login/email/#{email.confirm_token}?go=#{URI.encode_www_form(path)}")
 
       assert login.status == 200
       {:ok, view, _} = live(login)
