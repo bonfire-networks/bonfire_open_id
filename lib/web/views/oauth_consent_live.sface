@@ -20,8 +20,6 @@
       <StatelessComponent
         module={maybe_module(Bonfire.UI.Me.UserPreviewLive)}
         user={current_user(@__context__)}
-        with_summary={false}
-        is_local
         class="rounded-xl component_user_preview"
       />
       {#if @allow_switch_profile?}
