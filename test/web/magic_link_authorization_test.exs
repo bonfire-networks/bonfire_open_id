@@ -112,7 +112,7 @@ defmodule Bonfire.OpenID.Web.MagicLinkAuthorizationTest do
     |> Bonfire.Common.Repo.update!()
 
     second = post(conn(), path)
-    assert html_response(second, 200) =~ "This sign-in link is invalid or has expired"
+    assert html_response(second, 200) =~ "This link was already used"
     refute html_response(second, 200) =~ "data-role=\"oauth_consent\""
     refute Bonfire.Common.Utils.current_user(second)
   end

@@ -13,9 +13,13 @@ defmodule Bonfire.OpenID.Web.ClientController do
         #  redirect to authorization URL
         if params == %{} do
           # start flow: redirect to remote authorization URL
-          case openid_provider_url(provider, provider_config) do
+          state = Text.random_string()
+
+          case openid_provider_url(provider, provider_config, state) do
             {:ok, url} when is_binary(url) ->
-              redirect_to(conn, url, type: :maybe_external)
+              conn
+              |> put_session(state_key(provider), state)
+              |> redirect_to(url, type: :maybe_external)
 
             other ->
               error(
@@ -34,14 +38,21 @@ defmodule Bonfire.OpenID.Web.ClientController do
             params,
             l("An error occurred when trying to sign in with OpenID"),
             false
-          ) || with_open_id_connect(conn, provider, Map.new(provider_config), params)
+          ) ||
+            with_verified_state(conn, provider, params, fn conn ->
+              with_open_id_connect(conn, provider, Map.new(provider_config), params)
+            end)
         end
       else
         if provider_config = ed(Client.oauth2_providers(), provider, nil) do
           debug(provider_config)
           # start flow: redirect to remote authorization URL
           if params == %{} do
-            redirect_to(conn, oauth_provider_url(provider, provider_config),
+            state = Text.random_string()
+
+            conn
+            |> put_session(state_key(provider), state)
+            |> redirect_to(oauth_provider_url(provider, provider_config, state),
               type: :maybe_external
             )
           else
@@ -51,7 +62,10 @@ defmodule Bonfire.OpenID.Web.ClientController do
               params,
               l("An error occurred when trying to sign in with OAuth2"),
               false
-            ) || with_oauth2(conn, provider, Map.new(provider_config), params)
+            ) ||
+              with_verified_state(conn, provider, params, fn conn ->
+                with_oauth2(conn, provider, Map.new(provider_config), params)
+              end)
           end
         else
           raise Bonfire.Fail, {:not_found, "Provider #{Types.to_string_or_inspect(provider)}"}
@@ -65,7 +79,31 @@ defmodule Bonfire.OpenID.Web.ClientController do
     end
   end
 
-  def oauth_provider_url(provider, config \\ nil) do
+  # One slot per provider in the browser's session, so a sign-in started with one service cannot be answered with another's state.
+  defp state_key(provider), do: "client_state_#{provider}"
+
+  # A sign-in service's answer is only accepted for a sign-in this browser started: its `state` must be the one sent when the browser was redirected there. It is used once, so a replayed answer is refused too. Without this, a link carrying someone else's code could sign a person in as that someone else.
+  defp with_verified_state(conn, provider, params, fun) do
+    key = state_key(provider)
+    expected = get_session(conn, key)
+    given = params["state"]
+    conn = delete_session(conn, key)
+
+    if is_binary(expected) and is_binary(given) and Plug.Crypto.secure_compare(expected, given) do
+      fun.(conn)
+    else
+      warn(provider, "Sign-in answer refused: its state did not match the one this browser sent")
+
+      conn
+      |> assign_flash(
+        :error,
+        l("That sign-in could not be completed. Please start again from the sign-in page.")
+      )
+      |> redirect_to("/login")
+    end
+  end
+
+  def oauth_provider_url(provider, config \\ nil, state \\ Bonfire.Common.Text.random_string()) do
     with config when not is_nil(config) <- config || ed(Client.oauth2_providers(), provider, nil) do
       params =
         %{
@@ -78,7 +116,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
           # Optional - space-separated list of requested permissions
           "scope" => config[:scope],
           # Recommended - random string to prevent CSRF
-          "state" => Bonfire.Common.Text.random_string()
+          "state" => state
           # "prompt" => "consent"            # Optional - force showing the consent screen
           # "code_challenge_method" => "S256" # Optional - PKCE hash method
           # "code_challenge" => ?, # Optional - for PKCE
@@ -101,12 +139,16 @@ defmodule Bonfire.OpenID.Web.ClientController do
     "#{Bonfire.Common.URIs.base_url()}/openid/client/#{provider}"
   end
 
-  def openid_provider_url(provider, provider_config \\ nil) do
+  def openid_provider_url(
+        provider,
+        provider_config \\ nil,
+        state \\ Bonfire.Common.Text.random_string()
+      ) do
     with provider_config when not is_nil(provider_config) <-
            provider_config || ed(Client.open_id_connect_providers(), provider, nil) do
       # Base parameters
       base_params = %{
-        "state" => Bonfire.Common.Text.random_string(),
+        "state" => state,
         "nonce" => Bonfire.Common.Text.random_string()
       }
 
