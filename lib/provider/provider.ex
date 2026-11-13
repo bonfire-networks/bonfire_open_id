@@ -1,4 +1,7 @@
 defmodule Bonfire.OpenID.Provider do
+  @doc "Whether this instance runs its own sign-in service for other apps (OAuth and OpenID Connect provider). Its endpoints, and every place that advertises them, follow this."
+  def enabled?, do: System.get_env("ENABLE_SSO_PROVIDER") == "true"
+
   def alg_supported, do: ["RS256", "RS512"]
 
   @doc "Maps the grant-type spellings some clients send as a `response_type` onto the real thing. Lives here because `response_types_supported` used to advertise exactly these values, which is where clients got them. Any other value passes through for Boruta to validate, including an already-valid `code`."
@@ -46,7 +49,9 @@ defmodule Bonfire.OpenID.Provider do
       # CIMD: clients may use their own HTTPS URL as client_id (no pre-registration needed)
       "client_id_metadata_document_supported" => true,
       # This instance's own CIMD URL, used when connecting to other servers as a client
-      "client_id" => Bonfire.OpenID.Client.cimd_client_id()
+      "client_id" => Bonfire.OpenID.Client.cimd_client_id(),
+      # Mastodon's own key, which Mastodon API clients read to find `POST /api/v1/apps` (it isn't RFC 7591 registration, which is `registration_endpoint`)
+      "app_registration_endpoint" => "#{Bonfire.Common.URIs.base_url()}/api/v1/apps"
       # "ui_locales_supported" => ["en"]
     })
   end

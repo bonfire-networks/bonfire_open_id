@@ -6,7 +6,7 @@ defmodule Bonfire.OpenID.Web.Routes do
       import Bonfire.OpenID.Plugs.ClientID
 
       def check_provider_enabled(conn, _opts) do
-        if System.get_env("ENABLE_SSO_PROVIDER") == "true" do
+        if Bonfire.OpenID.Provider.enabled?() do
           conn
         else
           conn

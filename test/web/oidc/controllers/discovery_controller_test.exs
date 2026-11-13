@@ -52,6 +52,30 @@ defmodule Bonfire.OpenID.Web.Controllers.Openid.DiscoveryControllerTest do
     assert "sub" in doc["claims_supported"]
   end
 
+  # Mastodon's own key (not RFC 7591), which Mastodon API clients read to find where to register
+  test "the OAuth metadata names the Mastodon-compatible app registration endpoint, and it registers an app" do
+    url =
+      get(build_conn(), "/.well-known/oauth-authorization-server")
+      |> json_response(200)
+      |> Map.get("app_registration_endpoint")
+
+    assert url == Bonfire.Common.URIs.base_url() <> "/api/v1/apps"
+
+    registered =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post(
+        URI.parse(url).path,
+        Jason.encode!(%{
+          "client_name" => "Discovery test #{Faker.UUID.v4()}",
+          "redirect_uris" => "https://client.example/callback"
+        })
+      )
+      |> json_response(200)
+
+    assert is_binary(registered["client_id"])
+  end
+
   test "both discovery documents agree on every key that is not protocol-specific" do
     openid = get(build_conn(), "/.well-known/openid-configuration") |> json_response(200)
     oauth = get(build_conn(), "/.well-known/oauth-authorization-server") |> json_response(200)
