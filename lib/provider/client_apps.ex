@@ -64,6 +64,30 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       "write:statuses"
     ]
 
+  @doc "Every known scope an ordinary client may hold: all of `default_scopes/0` except the `admin:*` ones."
+  def non_admin_scopes,
+    do: Enum.reject(default_scopes(), &String.starts_with?(&1, "admin:"))
+
+  @doc """
+  Turns the scopes a client asks for at registration (a list or a space-separated string) into the scopes it gets.
+
+  Only known scopes are kept. When none are asked for (or none is known), `fallback` applies. `admin:*` scopes are kept only with `allow_admin: true`; even then a user can only authorize them when an instance admin (see `Bonfire.OpenID.authorized_scopes/1`).
+  """
+  def registrable_scopes(requested, fallback, opts \\ []) do
+    known = if opts[:allow_admin], do: default_scopes(), else: non_admin_scopes()
+
+    requested =
+      case requested do
+        scopes when is_binary(scopes) -> String.split(scopes, ~r/[\s,+]+/, trim: true)
+        scopes -> List.wrap(scopes)
+      end
+
+    case Enum.filter(requested, &(&1 in known)) |> Enum.uniq() do
+      [] -> fallback
+      scopes -> scopes
+    end
+  end
+
   # Overload to accept attrs for dynamic client creation (e.g., PKCE/public)
   def get_or_new(id_or_name, redirect_uris, attrs \\ %{}) do
     id = id_or_name_to_id(id_or_name)
@@ -246,14 +270,12 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
       authorize_scope: true,
       # scopes that are authorized using this client
       # ...existing code...
-      authorized_scopes: scopes_maps(),
-      # client supported grant types - NOTE: device not yet supported: https://github.com/malach-it/boruta_auth/issues/46
+      authorized_scopes: scopes_maps(non_admin_scopes()),
+      # client supported grant types (`password` and `implicit` only for clients that explicitly register them) - NOTE: device not yet supported: https://github.com/malach-it/boruta_auth/issues/46
       supported_grant_types: [
         "client_credentials",
-        "password",
         "authorization_code",
         "refresh_token",
-        "implicit",
         "revoke",
         "introspect"
       ],
@@ -283,8 +305,28 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
 
   def init_test_client_app(id \\ "b0f15e02-b0f1-b0f1-b0f1-b0f15eb0f15e", attrs \\ %{}) do
     case get(id: id) do
-      nil -> new(Map.merge(%{id: id, name: "Test client app"}, attrs))
-      client -> client
+      nil ->
+        new(
+          Map.merge(
+            %{
+              id: id,
+              name: "Test client app",
+              supported_grant_types: [
+                "client_credentials",
+                "password",
+                "authorization_code",
+                "refresh_token",
+                "implicit",
+                "revoke",
+                "introspect"
+              ]
+            },
+            attrs
+          )
+        )
+
+      client ->
+        client
     end
     |> from_ok()
   end
@@ -319,7 +361,8 @@ defmodule Bonfire.OpenID.Provider.ClientApps do
         %{
           id: client_id,
           redirect_uris: validated_params["redirect_uris"],
-          supported_scopes: parse_scopes(validated_params["scope"]) || default_scopes(),
+          authorized_scopes:
+            scopes_maps(registrable_scopes(validated_params["scope"], non_admin_scopes())),
           supported_grant_types: validated_params["grant_types"] || ["authorization_code"],
           name: validated_params["client_name"] || "Dynamically Registered Client",
           confidential: !public_client?,

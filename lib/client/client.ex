@@ -76,6 +76,13 @@ defmodule Bonfire.OpenID.Client do
     end)
   end
 
+  @doc "OAuth2 providers (which have no `email_verified` claim) trusted to link a sign-in to an existing local account by matching email, as strings. Empty by default: any other provider never links by email."
+  def trusted_oauth2_email_providers do
+    Config.get([:bonfire_open_id, :trusted_oauth2_email_providers], [])
+    |> List.wrap()
+    |> Enum.map(&to_string/1)
+  end
+
   def providers() do
     open_id_connect_providers() ++ oauth2_providers()
   end

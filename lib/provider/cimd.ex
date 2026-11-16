@@ -52,11 +52,10 @@ defmodule Bonfire.OpenID.Provider.CIMD do
            headers: [accept: "application/json"],
            receive_timeout: @timeout_ms,
            max_redirects: 3,
+           # the size is checked on the text as received, whatever its content type says
+           decode_body: false,
            plugins: [&Bonfire.Common.HTTP.SSRF.attach/1]
          ) do
-      {:ok, %{status: 200, body: body}} when is_map(body) ->
-        {:ok, body}
-
       {:ok, %{status: 200, body: body}} when is_binary(body) ->
         if byte_size(body) > @max_body_bytes do
           {:error, "CIMD document exceeds maximum allowed size"}

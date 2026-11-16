@@ -116,6 +116,14 @@ defmodule Bonfire.OpenID.RuntimeConfig do
         ]
     end
 
+    # OAuth2 providers (no `email_verified` claim) trusted to link a sign-in to an existing account by matching email, as a comma-separated list of provider names, eg. OAUTH2_TRUSTED_EMAIL_PROVIDERS=github,oauth_1 (default: none, so no OAuth2 provider links by email)
+    config :bonfire_open_id,
+           :trusted_oauth2_email_providers,
+           System.get_env("OAUTH2_TRUSTED_EMAIL_PROVIDERS", "")
+           |> String.split(",", trim: true)
+           |> Enum.map(&String.trim/1)
+           |> Enum.reject(&(&1 == ""))
+
     # connect as a client to an OAuth2 provider with callback url https://yourinstance.tld/oauth/client/oauth_1
     if oauth_app_client_id = System.get_env("OAUTH_1_CLIENT_ID") do
       config :bonfire_open_id, :oauth2_providers,

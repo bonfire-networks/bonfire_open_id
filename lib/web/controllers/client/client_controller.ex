@@ -14,11 +14,14 @@ defmodule Bonfire.OpenID.Web.ClientController do
         if params == %{} do
           # start flow: redirect to remote authorization URL
           state = Text.random_string()
+          nonce = Text.random_string()
 
-          case openid_provider_url(provider, provider_config, state) do
+          case openid_provider_url(provider, provider_config, state, nonce) do
             {:ok, url} when is_binary(url) ->
               conn
               |> put_session(state_key(provider), state)
+              # the id token must carry this back (checked in `with_open_id_connect/5`)
+              |> put_session(nonce_key(provider), nonce)
               |> redirect_to(url, type: :maybe_external)
 
             other ->
@@ -40,7 +43,11 @@ defmodule Bonfire.OpenID.Web.ClientController do
             false
           ) ||
             with_verified_state(conn, provider, params, fn conn ->
-              with_open_id_connect(conn, provider, Map.new(provider_config), params)
+              nonce = get_session(conn, nonce_key(provider))
+
+              conn
+              |> delete_session(nonce_key(provider))
+              |> with_open_id_connect(provider, Map.new(provider_config), params, nonce)
             end)
         end
       else
@@ -82,6 +89,9 @@ defmodule Bonfire.OpenID.Web.ClientController do
   # One slot per provider in the browser's session, so a sign-in started with one service cannot be answered with another's state.
   defp state_key(provider), do: "client_state_#{provider}"
 
+  # Same for the nonce an OpenID Connect sign-in sends: the id token that comes back must carry it, so a token issued for another sign-in is refused.
+  defp nonce_key(provider), do: "client_nonce_#{provider}"
+
   # A sign-in service's answer is only accepted for a sign-in this browser started: its `state` must be the one sent when the browser was redirected there. It is used once, so a replayed answer is refused too. Without this, a link carrying someone else's code could sign a person in as that someone else.
   defp with_verified_state(conn, provider, params, fun) do
     key = state_key(provider)
@@ -92,15 +102,19 @@ defmodule Bonfire.OpenID.Web.ClientController do
     if is_binary(expected) and is_binary(given) and Plug.Crypto.secure_compare(expected, given) do
       fun.(conn)
     else
-      warn(provider, "Sign-in answer refused: its state did not match the one this browser sent")
-
-      conn
-      |> assign_flash(
-        :error,
-        l("That sign-in could not be completed. Please start again from the sign-in page.")
-      )
-      |> redirect_to("/login")
+      refuse_sign_in(conn, provider, "its state did not match the one this browser sent")
     end
+  end
+
+  defp refuse_sign_in(conn, provider, why) do
+    warn(provider, "Sign-in answer refused: #{why}")
+
+    conn
+    |> assign_flash(
+      :error,
+      l("That sign-in could not be completed. Please start again from the sign-in page.")
+    )
+    |> redirect_to("/login")
   end
 
   def oauth_provider_url(provider, config \\ nil, state \\ Bonfire.Common.Text.random_string()) do
@@ -142,14 +156,15 @@ defmodule Bonfire.OpenID.Web.ClientController do
   def openid_provider_url(
         provider,
         provider_config \\ nil,
-        state \\ Bonfire.Common.Text.random_string()
+        state \\ Bonfire.Common.Text.random_string(),
+        nonce \\ Bonfire.Common.Text.random_string()
       ) do
     with provider_config when not is_nil(provider_config) <-
            provider_config || ed(Client.open_id_connect_providers(), provider, nil) do
       # Base parameters
       base_params = %{
         "state" => state,
-        "nonce" => Bonfire.Common.Text.random_string()
+        "nonce" => nonce
       }
 
       # Add PKCE parameters if present in config
@@ -233,7 +248,12 @@ defmodule Bonfire.OpenID.Web.ClientController do
            |> debug("token_data"),
          {:ok, %{body: userinfo_body}} <- user_info_body(config[:userinfo_uri], access_token),
          {:ok, userinfo} <- Jason.decode(userinfo_body) do
-      process_external_auth(conn, provider, config, Enum.into(userinfo, token_data))
+      process_external_auth(
+        conn,
+        provider,
+        config,
+        userinfo |> only_trusted_email(provider) |> Enum.into(token_data)
+      )
     else
       %{"error_description" => msg} = e ->
         error(e)
@@ -265,7 +285,7 @@ defmodule Bonfire.OpenID.Web.ClientController do
     redirect_to(conn, debug("#{authorize_uri}?#{query}"), type: :maybe_external)
   end
 
-  defp with_open_id_connect(conn, provider, provider_config, params) do
+  defp with_open_id_connect(conn, provider, provider_config, params, nonce) do
     info(params, "uri_params")
 
     # provider_config = provider_config
@@ -284,9 +304,18 @@ defmodule Bonfire.OpenID.Web.ClientController do
             |> info("fetched_tokens")},
          {:verify, {:ok, claims}} <-
            {:verify,
-            OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims")} do
-      process_external_auth(conn, provider, provider_config, Enum.into(claims, tokens))
+            OpenIDConnect.verify(provider_config, tokens["id_token"]) |> info("verified_claims")},
+         {:nonce, true} <- {:nonce, nonce_matches?(claims["nonce"], nonce)} do
+      process_external_auth(
+        conn,
+        provider,
+        provider_config,
+        claims |> only_verified_email() |> Enum.into(tokens)
+      )
     else
+      {:nonce, _} ->
+        refuse_sign_in(conn, provider, "its id token did not carry the nonce this browser sent")
+
       {:exchange, error} ->
         exchange_error(conn, error)
 
@@ -298,6 +327,31 @@ defmodule Bonfire.OpenID.Web.ClientController do
         )
     end
   end
+
+  defp nonce_matches?(given, expected) when is_binary(given) and is_binary(expected),
+    do: Plug.Crypto.secure_compare(given, expected)
+
+  defp nonce_matches?(_, _), do: false
+
+  # An email the service has not verified (`email_verified: true`) must not reach an existing local account, or anyone who can set an arbitrary email at the service could sign in as its owner. It is then treated like an email the service did not share at all. An email with no account yet is kept, to sign the person up.
+  defp only_verified_email(%{"email" => email} = claims) when is_binary(email) do
+    if claims["email_verified"] in [true, "true"] or
+         is_nil(Bonfire.Me.Accounts.get_by_email(email)),
+       do: claims,
+       else: Map.delete(claims, "email")
+  end
+
+  defp only_verified_email(claims), do: claims
+
+  # OAuth2 services have no `email_verified` claim, so an email only reaches an existing local account when the admin listed the provider as trusted (`:trusted_oauth2_email_providers`, set by `OAUTH2_TRUSTED_EMAIL_PROVIDERS`). Otherwise it is treated like an email the service did not share at all; an email with no account yet is kept, to sign the person up.
+  defp only_trusted_email(%{"email" => email} = userinfo, provider) when is_binary(email) do
+    if to_string(provider) in Client.trusted_oauth2_email_providers() or
+         is_nil(Bonfire.Me.Accounts.get_by_email(email)),
+       do: userinfo,
+       else: Map.delete(userinfo, "email")
+  end
+
+  defp only_trusted_email(userinfo, _provider), do: userinfo
 
   defp process_body_error(conn, body, error_msg) when is_binary(body) do
     case Jason.decode(body) do

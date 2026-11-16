@@ -79,10 +79,31 @@ defmodule Bonfire.OpenID do
   end
 
   @impl Boruta.Oauth.ResourceOwners
-  def authorized_scopes(%ResourceOwner{} = _resource_owner) do
-    # TODO: customize per user based on instance roles/boundaries
-    Bonfire.OpenID.Provider.ClientApps.scopes_structs()
+  def authorized_scopes(%ResourceOwner{sub: sub}) do
+    # only instance admins may authorize `admin:*` scopes
+    # TODO: customize further per user based on instance roles/boundaries
+    if instance_admin?(sub),
+      do: Bonfire.OpenID.Provider.ClientApps.scopes_structs(),
+      else:
+        Bonfire.OpenID.Provider.ClientApps.scopes_structs(
+          Bonfire.OpenID.Provider.ClientApps.non_admin_scopes()
+        )
   end
+
+  defp instance_admin?(sub) when is_binary(sub) do
+    case Users.get_current(sub) do
+      %{} = user ->
+        user
+        |> Bonfire.Common.Repo.maybe_preload(account: :instance_admin)
+        |> Accounts.is_admin?()
+        |> Kernel.==(true)
+
+      _ ->
+        false
+    end
+  end
+
+  defp instance_admin?(_), do: false
 
   @impl Boruta.Oauth.ResourceOwners
   def claims(%ResourceOwner{} = resource_owner, scope) do

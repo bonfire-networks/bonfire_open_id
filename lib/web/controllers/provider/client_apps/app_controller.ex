@@ -15,7 +15,12 @@ defmodule Bonfire.API.MastoCompatible.AppController do
     with {:ok, client} <-
            ClientApps.new(%{
              name: String.trim("#{params["client_name"]} #{params["website"]}"),
-             redirect_uris: ClientApps.prepare_redirect_uris(params["redirect_uris"])
+             redirect_uris: ClientApps.prepare_redirect_uris(params["redirect_uris"]),
+             # the app gets only the scopes it asked for (Mastodon defaults to `read`); whether a user may grant `admin:*` ones is decided when authorizing
+             authorized_scopes:
+               ClientApps.scopes_maps(
+                 ClientApps.registrable_scopes(params["scopes"], ["read"], allow_admin: true)
+               )
            }) do
       json(conn, %{
         "id" => client.id,

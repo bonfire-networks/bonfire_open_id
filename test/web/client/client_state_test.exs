@@ -27,6 +27,7 @@ defmodule Bonfire.OpenID.Web.ClientStateTest do
     )
 
     Repatch.patch(OpenIDConnect, :authorization_uri, fn _provider, _redirect_uri, params ->
+      Process.put(:oidc_nonce, params["nonce"])
       {:ok, "https://orcid.org/authorize?" <> URI.encode_query(params)}
     end)
 
@@ -38,7 +39,14 @@ defmodule Bonfire.OpenID.Web.ClientStateTest do
     end)
 
     Repatch.patch(OpenIDConnect, :verify, fn _provider, _token ->
-      {:ok, %{"iss" => "https://orcid.org", "sub" => "0000-0002-1825-0097", "name" => "A Person"}}
+      {:ok,
+       %{
+         "iss" => "https://orcid.org",
+         "sub" => "0000-0002-1825-0097",
+         "name" => "A Person",
+         # the service echoes the nonce it was sent
+         "nonce" => Process.get(:oidc_nonce)
+       }}
     end)
 
     :ok

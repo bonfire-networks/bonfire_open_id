@@ -37,18 +37,13 @@ defmodule Bonfire.OpenID.Web.Routes do
 
       # server/provider routes
 
-      scope "/oauth", Bonfire.OpenID.Web.Oauth do
-        pipe_through([:check_provider_enabled, :basic, :validate_client_id])
-
-        post("/revoke", RevokeController, :revoke)
-        post("/introspect", IntrospectController, :introspect)
-      end
-
-      # Token issuance — throttled (brute-force auth vector)
+      # Token issuance, revocation and introspection all take a client's credentials, so all are throttled (brute-force auth vector)
       scope "/oauth", Bonfire.OpenID.Web.Oauth do
         pipe_through([:check_provider_enabled, :basic, :validate_client_id, :throttle_forms])
 
         post("/token", TokenController, :token)
+        post("/revoke", RevokeController, :revoke)
+        post("/introspect", IntrospectController, :introspect)
       end
 
       # Authorize (GET) renders the consent screen as a LiveView, so it needs the full
