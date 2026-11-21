@@ -372,12 +372,7 @@ defmodule Bonfire.OpenID.Web.AuthorizationFlowsTest do
   end
 
   defp approve(conn, path) do
-    {:ok, view, _} = live(conn, path)
-
-    assert {:error, {:live_redirect, %{to: next}}} =
-             view |> element("[data-role=oauth_consent_allow]") |> render_click()
-
-    callback = conn |> get(next) |> redirected_to()
+    callback = Bonfire.OpenID.Test.OAuthWalk.approve(conn, path)
     assert_callback(callback)
     callback
   end
